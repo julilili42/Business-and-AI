@@ -1,0 +1,82 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# =========================
+# Packaging / Build
+# =========================
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# Logs & Cache
+# =========================
+*.log
+*.tmp
+*.cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Secrets / Env
+# =========================
+.env
+.env.*
+*.env
+
+# =========================
+# Output deiner Pipeline
+# =========================
+Output/
+output/
+results/
+*.txt
+bilder/
+
+# =========================
+# Large / Generated Files
+# =========================
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.tiff
+
+# =========================
+# Jupyter (falls genutzt)
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Tesseract / Poppler (lokal)
+# =========================
+Tesseract-OCR/
+Poppler/
