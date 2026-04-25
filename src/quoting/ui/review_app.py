@@ -1,5 +1,6 @@
 """
 Streamlit Review UI - ElringKlinger Edition
+
 Optimiertes Frontend mit Partner-Integration.
 """
 from __future__ import annotations
@@ -17,14 +18,13 @@ import streamlit as st
 _THIS_FILE = Path(__file__).resolve()
 _PROJECT_ROOT = _THIS_FILE.parents[3]
 _SRC_DIR = _THIS_FILE.parents[2]
-
 for p in (_PROJECT_ROOT, _SRC_DIR):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from quoting.core import Anfrage, Position, load_settings
+from quoting.core import Anfrage, load_settings
 from quoting.extraction import extract_anfrage
-from quoting.ingestion import detect_file_type, parse_mail
+from quoting.ingestion import Mail, detect_file_type, mail_from_file, parse_mail
 from quoting.matching import load_stammdaten, match_positions
 from quoting.output import build_draft_pdf
 from quoting.pricing import build_quotation
@@ -37,6 +37,7 @@ from quoting.ui.review_agent import (
     upsert_override,
 )
 
+
 # ==========================================
 # PAGE CONFIG & STYLING
 # ==========================================
@@ -46,16 +47,15 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
 def apply_style():
     st.markdown("""
-        <style>
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        
         html, body, [data-testid="stAppViewContainer"] {
             font-family: 'Inter', sans-serif;
             background-color: #fcfcfc;
         }
-
         /* HEADER LOGOS: DEUTLICH GRÖSSER */
         .header-container {
             display: flex;
@@ -75,11 +75,10 @@ def apply_style():
             letter-spacing: 2px;
         }
         .partner-logo {
-            height: 80px; /* Hier: Von 35px auf 80px erhöht */
+            height: 80px;  /* Hier: Von 35px auf 80px erhöht */
             width: auto;
             object-fit: contain;
         }
-
         /* Sidebar & Buttons */
         [data-testid="stSidebar"] { background-color: #ffffff !important; }
         .stButton>button {
@@ -87,7 +86,7 @@ def apply_style():
             font-weight: bold;
             padding: 0.75rem 2rem;
         }
-        </style>
+    </style>
     """, unsafe_allow_html=True)
 
 apply_style()
@@ -97,6 +96,7 @@ def img_to_base64(path):
     p = Path(path)
     if not p.exists(): return None
     return base64.b64encode(p.read_bytes()).decode()
+
 
 # ==========================================
 # CACHED HELPERS
@@ -109,28 +109,34 @@ def _settings():
 def _stammdaten():
     return load_stammdaten(_settings().stammdaten_path)
 
+
+def _build_mail(input_path: Path) -> Mail:
+    """Wrap any uploaded file as a Mail."""
+    typ = detect_file_type(input_path)
+    if typ in ("eml", "msg"):
+        return parse_mail(input_path)
+    return mail_from_file(input_path)
+
+
 @st.cache_data(show_spinner="🤖 KI extrahiert Daten...")
-def _extract_cached(content_hash: str, file_path: str, mail_body: str) -> dict:
-    p = Path(file_path)
-    typ = detect_file_type(p)
-    if typ in ["eml", "msg"]:
-        mail = parse_mail(p)
-        anfrage = extract_anfrage(mail.attachments, mail.body, _settings())
-    else:
-        anfrage = extract_anfrage([p], mail_body, _settings())
+def _extract_cached(content_hash: str, file_path: str) -> dict:
+    """Extract Anfrage from a Mail built from file_path. Cached on content_hash."""
+    mail = _build_mail(Path(file_path))
+    anfrage = extract_anfrage(mail.attachments, mail.body, _settings())
     return anfrage.model_dump(mode="json")
 
 
 @st.cache_data
 def _mail_body_cached(file_path: str) -> str:
+    """Return mail body if the upload was an .eml/.msg, else empty."""
     p = Path(file_path)
-    if detect_file_type(p) in ["eml", "msg"]:
+    if detect_file_type(p) in ("eml", "msg"):
         return parse_mail(p).body or ""
     return ""
 
+
 # --- Session State Helpers ---
 _EDITOR_KEY_PREFIXES = ("art_", "mng_", "eh_", "lt_", "ws_", "zn_", "bez_")
-
 
 def _reset_agent_state() -> None:
     for key in (
@@ -162,15 +168,15 @@ def _load_anfrage_once(content_hash: str, input_path: Path) -> Anfrage:
     if st.session_state.get("anfrage_hash") != content_hash:
         _reset_editor_state()
         _reset_agent_state()
-        anfrage_dict = _extract_cached(content_hash, str(input_path), "")
+        anfrage_dict = _extract_cached(content_hash, str(input_path))
         st.session_state["anfrage"] = Anfrage.model_validate(anfrage_dict)
         st.session_state["anfrage_hash"] = content_hash
     return st.session_state["anfrage"]
 
-
 def _safe_file_stub(name: str) -> str:
     stem = Path(name).stem
     return re.sub(r"[^A-Za-z0-9._-]+", "_", stem).strip("._") or "angebot"
+
 
 # ==========================================
 # UI HEADER (PARTNER LOGOS)
@@ -186,6 +192,7 @@ if bw_bank_logo: header_html += f'<img src="data:image/png;base64,{bw_bank_logo}
 header_html += '</div>'
 st.markdown(header_html, unsafe_allow_html=True)
 
+
 # ==========================================
 # SIDEBAR (BRANDING & EINGABE)
 # ==========================================
@@ -195,18 +202,18 @@ with st.sidebar:
         st.markdown(f'<img src="data:image/png;base64,{elring_logo}" style="width: 100%; margin-bottom: 20px;">', unsafe_allow_html=True)
     else:
         st.title("ElringKlinger")
-    
+
     st.markdown("### 📥 Dateiupload")
     uploaded = st.file_uploader(
         "Anfrage hochladen",
         type=["pdf", "msg", "eml", "xlsx", "xls"],
         label_visibility="collapsed"
     )
-    
+
     st.markdown("---")
     fuzzy_threshold = st.slider("Fuzzy-Match Schwellenwert", 50, 100, 85)
-    
     st.info("💡 **Workflow:**\n1. Datei hochladen\n2. Daten prüfen\n3. Match bestätigen\n4. Angebot generieren")
+
 
 # ==========================================
 # MAIN CONTENT
@@ -257,7 +264,7 @@ with col_doc:
 
 with col_extract:
     st.subheader("🤖 Extrahierte Daten")
-    
+
     with st.expander("🏢 Header & Kundeninformationen", expanded=True):
         c_k1, c_k2 = st.columns(2)
         anfrage.kunde_firma = c_k1.text_input("Firma", anfrage.kunde_firma or "")
@@ -266,13 +273,14 @@ with col_extract:
         anfrage.belegnummer = c_k2.text_input("Referenz-Nr", anfrage.belegnummer or "")
 
     st.markdown("#### Positionen")
+
     icons = {"high": "🟢", "medium": "🟡", "low": "🔴"}
     edited_positions = []
 
     for i, pos in enumerate(anfrage.positionen):
         status_icon = icons.get(pos.confidence, "⚪")
         label = f"{status_icon} Pos {pos.pos_nr} — {pos.artikelnummer or 'Unbekannt'}"
-        
+
         with st.expander(label):
             c1, c2 = st.columns(2)
             with c1:
@@ -283,9 +291,9 @@ with col_extract:
                 pos.liefertermin = st.text_input("Liefertermin", pos.liefertermin or "", key=f"lt_{i}")
                 pos.werkstoff = st.text_input("Werkstoff", pos.werkstoff or "", key=f"ws_{i}")
                 pos.zeichnungsnummer = st.text_input("Zeichnungs-Nr.", pos.zeichnungsnummer or "", key=f"zn_{i}")
-            
             pos.bezeichnung = st.text_area("Bezeichnung", pos.bezeichnung, key=f"bez_{i}", height=70)
-        edited_positions.append(pos)
+
+            edited_positions.append(pos)
 
     anfrage.positionen = edited_positions
     st.session_state["anfrage"] = anfrage
@@ -295,8 +303,8 @@ st.markdown("---")
 st.subheader("🔗 Stammdaten-Abgleich")
 
 matches = match_positions(
-    anfrage.positionen, 
-    _stammdaten(), 
+    anfrage.positionen,
+    _stammdaten(),
     fuzzy_threshold=fuzzy_threshold,
     semantic_threshold=_settings().semantic_threshold
 )
@@ -318,7 +326,6 @@ if st.button("📝 Entwurf-Angebot erstellen", type="primary", use_container_wid
             upload_dir = Path(tempfile.gettempdir()) / "quoting_uploads" / content_hash
             upload_dir.mkdir(parents=True, exist_ok=True)
             pdf_out = upload_dir / "draft_angebot.pdf"
-
             build_draft_pdf(anfrage, quotation, pdf_out)
 
             if pdf_out.exists():
@@ -359,8 +366,8 @@ if st.button("📝 Entwurf-Angebot erstellen", type="primary", use_container_wid
 if st.session_state.get("quotation_hash") == content_hash and st.session_state.get("quotation"):
     st.markdown("---")
     st.subheader("💬 Agent Chat")
-    agent_lang = st.session_state.get("agent_lang", "de")
 
+    agent_lang = st.session_state.get("agent_lang", "de")
     messages = st.session_state.setdefault("agent_messages", [])
     for msg in messages:
         with st.chat_message(msg["role"]):
@@ -374,9 +381,9 @@ if st.session_state.get("quotation_hash") == content_hash and st.session_state.g
     user_msg = st.chat_input(chat_placeholder)
     if user_msg:
         messages.append({"role": "user", "content": user_msg})
-
         current_quotation = st.session_state["quotation"]
         known_articles = [p.artikelnummer for p in anfrage.positionen if p.artikelnummer]
+
         parsed_override, parse_feedback = parse_edit_instruction(
             user_msg,
             known_articles,

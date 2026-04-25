@@ -1,8 +1,12 @@
-"""Parse .eml and .msg files into body + attachment paths."""
+"""Unified Mail data structure + parsers for .eml / .msg / loose files.
+
+The Mail object is the *only* input the pipeline accepts. Every entry point
+(API, CLI, tests) builds a Mail and hands it to QuotingPipeline.run().
+"""
 from __future__ import annotations
 
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from email import policy
 from email.parser import BytesParser
 from html.parser import HTMLParser
@@ -10,32 +14,60 @@ from pathlib import Path
 
 
 @dataclass
-class MailData:
-    subject: str
-    sender: str
-    body: str
-    attachments: list[Path]
+class Mail:
+    """Everything the pipeline needs to know about an incoming RFQ.
+
+    Attachments are concrete file paths on disk. Whoever builds the Mail is
+    responsible for writing attachment bytes to a real location (temp dir,
+    review folder, etc.) — the pipeline only reads from `attachments`.
+    """
+    subject: str = ""
+    sender: str = ""
+    body: str = ""
+    attachments: list[Path] = field(default_factory=list)
+
+    @property
+    def has_content(self) -> bool:
+        """True if there's anything for the LLM to look at."""
+        return bool(self.attachments) or bool(self.body.strip())
 
 
-def parse_mail(mail_path: Path, temp_dir: Path | None = None) -> MailData:
-    """Parse .eml or .msg -> body + attachments written to temp_dir."""
+# Backwards-compat alias — older code imported `MailData`.
+MailData = Mail
+
+
+def parse_mail(mail_path: Path, temp_dir: Path | None = None) -> Mail:
+    """Parse .eml or .msg into a Mail. Attachments are written to temp_dir."""
     suffix = mail_path.suffix.lower()
-
     if suffix == ".msg":
         return _parse_msg(mail_path, temp_dir)
-    else:
-        return _parse_eml(mail_path, temp_dir)
+    return _parse_eml(mail_path, temp_dir)
 
 
-def _parse_eml(eml_path: Path, temp_dir: Path | None = None) -> MailData:
-    """Parse .eml -> body + attachments written to temp_dir."""
+def mail_from_file(path: Path) -> Mail:
+    """Wrap a single non-mail file (PDF/XLSX/CSV/...) as a Mail with no body.
+
+    Useful for CLI usage where the user passes a bare attachment instead of
+    a full mail.
+    """
+    return Mail(
+        subject=path.name,
+        sender="",
+        body="",
+        attachments=[path],
+    )
+
+
+# ---------- internals ----------
+
+
+def _parse_eml(eml_path: Path, temp_dir: Path | None = None) -> Mail:
     target_dir = temp_dir or Path(tempfile.mkdtemp(prefix="eml_att_"))
     target_dir.mkdir(parents=True, exist_ok=True)
 
     with open(eml_path, "rb") as f:
         msg = BytesParser(policy=policy.default).parse(f)
 
-    # Body: prefer text/plain, fall back to stripped HTML
     body_text = ""
     body_html = ""
     for part in msg.walk():
@@ -49,7 +81,6 @@ def _parse_eml(eml_path: Path, temp_dir: Path | None = None) -> MailData:
             body_html = part.get_content()
     body = body_text or _html_to_text(body_html)
 
-    # Attachments: safe filenames only (no path traversal)
     attachments: list[Path] = []
     for part in msg.iter_attachments():
         filename = part.get_filename()
@@ -62,19 +93,15 @@ def _parse_eml(eml_path: Path, temp_dir: Path | None = None) -> MailData:
             target.write_bytes(payload)
             attachments.append(target)
 
-    return MailData(
-        subject=msg.get("Subject", ""),
-        sender=msg.get("From", ""),
+    return Mail(
+        subject=msg.get("Subject", "") or "",
+        sender=msg.get("From", "") or "",
         body=body,
         attachments=attachments,
     )
 
 
-def _parse_msg(msg_path: Path, temp_dir: Path | None = None) -> MailData:
-    """Parse Outlook .msg -> body + attachments written to temp_dir.
-
-    Requires: pip install extract-msg
-    """
+def _parse_msg(msg_path: Path, temp_dir: Path | None = None) -> Mail:
     try:
         import extract_msg
     except ImportError as e:
@@ -87,21 +114,18 @@ def _parse_msg(msg_path: Path, temp_dir: Path | None = None) -> MailData:
     target_dir.mkdir(parents=True, exist_ok=True)
 
     with extract_msg.openMsg(msg_path) as msg:
-        # Body: prefer plain text, fall back to stripped HTML
         body = msg.body or _html_to_text(msg.htmlBody or "")
-
         attachments: list[Path] = []
         for att in msg.attachments:
             if not att.data:
                 continue
-            # longFilename falls back to shortFilename if not set
             filename = att.longFilename or att.shortFilename or "attachment"
             safe_name = Path(filename).name
             target = target_dir / safe_name
             target.write_bytes(att.data)
             attachments.append(target)
 
-        return MailData(
+        return Mail(
             subject=msg.subject or "",
             sender=msg.sender or "",
             body=body,
@@ -119,7 +143,6 @@ class _TextStripper(HTMLParser):
 
 
 def _html_to_text(html: str) -> str:
-    """Minimal HTML -> text fallback (no external deps)."""
     if not html:
         return ""
     try:

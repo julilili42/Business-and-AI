@@ -1,14 +1,16 @@
 """End-to-end pipeline orchestrator.
 
 Stages in order:
-  1. ingest    - file -> body + attachments
-  2. extract   - attachments -> Anfrage (LLM)
-  3. match     - positions -> MatchResults (deterministic)
-  4. price     - Anfrage + matches -> Quotation
-  5. render    - Quotation -> draft PDF + JSON
+    1. (no separate ingest stage — caller hands us a Mail)
+    2. extract   - body + ALL attachments -> Anfrage (LLM)
+    3. match     - positions -> MatchResults (deterministic)
+    4. price     - Anfrage + matches -> Quotation
+    5. render    - Quotation -> draft PDF + JSON
 
-Each stage lives in its own sub-package. This file is the only place where
-their order is encoded.
+The pipeline accepts a Mail object only. Whoever calls the pipeline (API,
+CLI, tests) is responsible for building that Mail. This keeps the pipeline
+generic — it doesn't care whether the source was Outlook JSON, an .eml
+file on disk, or a bare PDF wrapped via `mail_from_file`.
 """
 from __future__ import annotations
 
@@ -18,7 +20,7 @@ from pathlib import Path
 
 from .core import Anfrage, Settings, add_file_handler, get_logger, load_settings
 from .extraction import extract_anfrage
-from .ingestion import detect_file_type, parse_mail
+from .ingestion import Mail
 from .matching import MatchResult, load_stammdaten, match_positions
 from .output import build_draft_pdf, save_json
 from .pricing import Quotation, build_quotation
@@ -28,7 +30,7 @@ log = get_logger()
 
 @dataclass
 class PipelineResult:
-    input_path: Path
+    mail: Mail
     work_dir: Path
     anfrage: Anfrage
     matches: list[MatchResult]
@@ -38,7 +40,9 @@ class PipelineResult:
 
     def summary(self) -> dict:
         return {
-            "input": str(self.input_path),
+            "subject": self.mail.subject,
+            "sender": self.mail.sender,
+            "attachments": [a.name for a in self.mail.attachments],
             "positions": len(self.anfrage.positionen),
             "exact": sum(1 for m in self.matches if m.status == "exact"),
             "fuzzy": sum(1 for m in self.matches if m.status == "fuzzy"),
@@ -65,30 +69,47 @@ class QuotingPipeline:
 
     def run(
         self,
-        input_path: Path,
+        mail: Mail,
         output_dir: Path | None = None,
-        mail_body: str = "",
+        work_name: str | None = None,
     ) -> PipelineResult:
+        """Process a Mail end-to-end.
+
+        Args:
+            mail: The incoming RFQ — body and any attachments.
+            output_dir: Base directory for run artifacts. Defaults to settings.
+            work_name: Subfolder name under output_dir. Defaults to a sensible
+                stem derived from the mail (first attachment's stem, otherwise
+                a sanitized subject).
+        """
+        if not mail.has_content:
+            raise ValueError(
+                "Mail has neither body nor attachments — nothing to extract."
+            )
+
         start = time.time()
         output_dir = output_dir or self.settings.output_dir
-        work_dir = output_dir / input_path.stem
+        work_dir = output_dir / (work_name or _derive_work_name(mail))
         work_dir.mkdir(parents=True, exist_ok=True)
+
         add_file_handler(work_dir / "run.log")
-
         log.info("=" * 60)
-        log.info("Processing: %s", input_path.name)
-        log.info("Work dir  : %s", work_dir)
+        log.info("Subject     : %s", mail.subject or "(no subject)")
+        log.info("From        : %s", mail.sender or "(unknown)")
+        log.info("Body length : %d chars", len(mail.body))
+        log.info("Attachments : %d", len(mail.attachments))
+        log.info("Work dir    : %s", work_dir)
 
-        attachments, body = self._ingest(input_path, mail_body)
-        anfrage = self._extract(attachments, body, work_dir)
+        anfrage = self._extract(mail, work_dir)
         matches = self._match(anfrage, work_dir)
         quotation = self._price(anfrage, matches, work_dir)
-        pdf_path = self._render(anfrage, quotation, input_path.stem, work_dir)
+        pdf_path = self._render(anfrage, quotation, work_dir.name, work_dir)
 
         duration = time.time() - start
         log.info("Done in %.2fs - total %.2f EUR", duration, quotation.gesamtsumme)
+
         return PipelineResult(
-            input_path=input_path,
+            mail=mail,
             work_dir=work_dir,
             anfrage=anfrage,
             matches=matches,
@@ -99,29 +120,24 @@ class QuotingPipeline:
 
     # ---------- individual stages ----------
 
-    def _ingest(self, input_path: Path, mail_body: str) -> tuple[list[Path], str]:
-        file_type = detect_file_type(input_path)
-        log.info("Detected type: %s", file_type)
-
-        if file_type == "eml":
-            mail = parse_mail(input_path)
-            log.info("Mail body: %d chars, %d attachment(s)",
-                     len(mail.body), len(mail.attachments))
-            return mail.attachments, mail.body
-        if file_type in ("pdf", "xlsx", "csv"):
-            return [input_path], mail_body
-        raise ValueError(f"Unsupported input type: {file_type}")
-
-    def _extract(
-        self, attachments: list[Path], mail_body: str, work_dir: Path,
-    ) -> Anfrage:
-        log.info("Extract: LLM...")
-        anfrage = extract_anfrage(attachments, mail_body, self.settings)
+    def _extract(self, mail: Mail, work_dir: Path) -> Anfrage:
+        log.info(
+            "Extract: LLM with %d attachment(s)%s...",
+            len(mail.attachments),
+            " (body only — no attachments)" if not mail.attachments else "",
+        )
+        anfrage = extract_anfrage(
+            attachments=mail.attachments,
+            mail_body=mail.body,
+            settings=self.settings,
+        )
         save_json(anfrage.model_dump(mode="json"), work_dir / "01_extracted.json")
         for pos in anfrage.positionen:
-            log.info("  Pos %d [%s]: %s x%s - %s",
-                     pos.pos_nr, pos.confidence, pos.artikelnummer,
-                     pos.menge, pos.bezeichnung[:50])
+            log.info(
+                "  Pos %d [%s]: %s x%s - %s",
+                pos.pos_nr, pos.confidence, pos.artikelnummer,
+                pos.menge, pos.bezeichnung[:50],
+            )
         return anfrage
 
     def _match(self, anfrage: Anfrage, work_dir: Path) -> list[MatchResult]:
@@ -153,3 +169,14 @@ class QuotingPipeline:
         pdf_path = work_dir / f"{name}_ANGEBOT_DRAFT.pdf"
         build_draft_pdf(anfrage, quotation, pdf_path)
         return pdf_path
+
+
+def _derive_work_name(mail: Mail) -> str:
+    """Pick a reasonable folder name for this run."""
+    if mail.attachments:
+        return mail.attachments[0].stem
+    if mail.subject:
+        # keep it filesystem-safe and short
+        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in mail.subject)
+        return safe[:80] or "run"
+    return "run"

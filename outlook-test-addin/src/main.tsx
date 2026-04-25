@@ -112,61 +112,34 @@ function formatAttachments(attachments: MailAttachment[]): string {
     )
     .join("\n\n");
 }
-function createDraftMail(
+
+async function createDraftMail(
   result: CreateReviewResponse,
   mail: MailSnapshot,
   setStatus: (s: string) => void,
 ) {
   const subject = `Angebot zu Ihrer Anfrage: ${mail.subject}`;
-
   const htmlBody = `
     <p>Sehr geehrte Damen und Herren,</p>
     <p>vielen Dank für Ihre Anfrage.</p>
     <p>Anbei erhalten Sie unseren Angebotsentwurf.</p>
-    <p><b>Debug PDF URL:</b><br/>
-      <a href="${result.draft_pdf_url}">${result.draft_pdf_url}</a>
-    </p>
     <p>Mit freundlichen Grüßen<br/>ElringKlinger Kunststofftechnik</p>
   `;
 
-  console.log("createDraftMail result:", result);
-  console.log("PDF URL:", result.draft_pdf_url);
+  Office.context.mailbox.displayNewMessageForm({
+    toRecipients: [],
+    subject,
+    htmlBody,
+    attachments: [
+      {
+        type: "file",
+        name: result.draft_pdf_filename,
+        url: result.draft_pdf_url,
+      },
+    ],
+  });
 
-  try {
-    Office.context.mailbox.displayNewMessageForm({
-      toRecipients: [],
-      subject,
-      htmlBody,
-      attachments: [
-        {
-          type: Office.MailboxEnums.AttachmentType.File,
-          name: result.draft_pdf_filename,
-          url: result.draft_pdf_url,
-          isInline: false,
-        },
-      ],
-    });
-    
-
-    setStatus(
-      [
-        "displayNewMessageForm called.",
-        `Review ID: ${result.review_id}`,
-        `PDF filename: ${result.draft_pdf_filename}`,
-        `PDF URL: ${result.draft_pdf_url}`,
-      ].join("\n"),
-    );
-  } catch (e) {
-    console.error("displayNewMessageForm failed:", e);
-
-    setStatus(
-      [
-        "displayNewMessageForm threw an error.",
-        `Error: ${String(e)}`,
-        `PDF URL: ${result.draft_pdf_url}`,
-      ].join("\n"),
-    );
-  }
+  setStatus(`Draft mail opened with attachment (${result.review_id})`);
 }
 
 async function createReview(mail: MailSnapshot): Promise<CreateReviewResponse> {

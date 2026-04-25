@@ -1,51 +1,109 @@
 # ElringKlinger Quoting Pipeline
 
-AI-assisted draft quotation generator: RFQ (PDF / Mail / Excel) → structured extraction → master-data matching → draft PDF quotation.
-
-## Pipeline flow
+KI-gestützter Generator für Angebotsentwürfe.
+**RFQ (PDF / Mail / Excel) → strukturierte Extraktion → Stammdaten-Match → Draft-Angebot (PDF)**
 
 ```text
-ingestion ──► extraction ──► matching ──► pricing ──► output
-(eml/pdf/xlsx) (LLM)        (fuzzy)      (rules)    (PDF+JSON)
+ingestion ─► extraction ─► matching ─► pricing ─► output
+(eml/pdf/xlsx)  (LLM)       (fuzzy)    (rules)   (PDF + JSON)
 ```
 
-Each stage lives in its own sub-package under `src/quoting/`. The only place where the stage order is encoded is `pipeline.py`.
+Jede Stufe lebt in einem eigenen Sub-Package unter `src/quoting/`. Die Reihenfolge
+ist nur in `pipeline.py` codiert.
 
-## Environment configuration
+---
 
-The project uses `python-dotenv` and loads local environment variables from a `.env` file.
+## Voraussetzungen
 
-A template is provided in `.env.example`. Copy it once and fill in the required values locally:
+- Python ≥ 3.11
+- Node.js ≥ 20 (nur für das Outlook Add-in)
+- [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/)
+  (nur für das Outlook Add-in, damit die lokale API von außen erreichbar ist)
+- API-Key für Gemini **oder** Azure OpenAI
+
+---
+
+## Setup
 
 ```bash
+# 1. Projekt installieren (editable + dev tools)
+pip install -e ".[dev]"
+
+# 2. .env aus Vorlage erzeugen und API-Key eintragen
 cp .env.example .env
+# danach .env öffnen und GOOGLE_API_KEY (oder NEXUS_API_KEY) setzen
 ```
 
-The `.env` file must not be committed because it can contain API keys and secrets.
+Die `.env` ist gitignored — sie enthält Secrets.
 
-Minimum configuration for local extraction:
+---
+
+## Drei Wege, die Pipeline zu benutzen
+
+### A) CLI — schnellste Variante zum Testen
 
 ```bash
-LLM_PROVIDER=gemini
-GOOGLE_API_KEY=your-google-api-key
+# Eine Datei
+python -m quoting.cli run path/to/rfq.pdf
+
+# Ganzer Ordner
+python -m quoting.cli batch ./inbox --output ./results
 ```
 
-For Azure OpenAI / Nexus:
+Akzeptierte Inputs: `.pdf`, `.eml`, `.msg`, `.xlsx`, `.xls`, `.csv`.
+
+### B) Streamlit Review-UI — manueller Upload mit Reviewer-Chat
 
 ```bash
-LLM_PROVIDER=azure
-NEXUS_API_KEY=your-nexus-api-key
-AZURE_OPENAI_ENDPOINT=https://genai-nexus.api.corpinter.net/
-AZURE_OPENAI_API_VERSION=2024-10-21
-AZURE_OPENAI_MODEL=gpt-5-mini
+python run_ui.py
 ```
 
-Optional runtime paths:
+Browser öffnet sich auf `http://localhost:8501`. PDF/EML hochladen, extrahierte
+Positionen reviewen, Draft-Angebot generieren, im Chat kommerziell anpassen
+("Gib 5% Rabatt auf Pos 2", "Setze Pos 3 auf 10 EUR"), neu rendern lassen.
+
+### C) Outlook Add-in — End-to-End aus dem Postfach
+
+Drei Komponenten müssen parallel laufen:
 
 ```bash
-OUTPUT_DIR=./output
-DATA_DIR=./data
+# Terminal 1 — FastAPI + Cloudflare-Tunnel (publishes .tunnel_url)
+python run_review_api.py
+
+# Terminal 2 — Streamlit Review-UI
+python run_ui.py
+
+# Terminal 3 — Outlook Add-in (Vite Dev Server auf https://localhost:5173)
+cd outlook-test-addin
+npm install        # nur einmal
+npm run dev
 ```
+
+`run_review_api.py` startet uvicorn auf `127.0.0.1:8000` und parallel einen
+cloudflared-Quick-Tunnel. Die aktuelle öffentliche Tunnel-URL wird live in
+`.tunnel_url` (Projekt-Root) geschrieben — die FastAPI liest sie pro Request,
+damit `draft_pdf_url` immer auf die *aktuelle* Tunnel-URL zeigt. Kein manuelles
+`.env`-Editieren nötig.
+
+**Add-in in Outlook laden** (einmalig):
+
+1. In Outlook → "Add-Ins verwalten" → "Mein Add-In hinzufügen" → "Aus Datei"
+2. `outlook-test-addin/manifest.xml` auswählen
+3. Eine Mail öffnen → Button **TEST** in der Ribbon → Panel öffnet sich
+4. **"Draft Quotation erstellen"** klickt durch:
+   Mail-Snapshot → API → Pipeline → PDF → neue Outlook-Mail mit PDF-Anhang
+
+Schneller Sanity-Check:
+
+```bash
+curl http://127.0.0.1:8000/health
+# {"ok": true, "api_base_url": "https://...trycloudflare.com"}
+```
+
+Die zurückgegebene URL muss zur Live-Tunnel-URL passen, die `cloudflared`
+beim Start in der Konsole anzeigt.
+
+---
 
 ## Layout
 
@@ -53,39 +111,36 @@ DATA_DIR=./data
 quoting-pipeline/
 ├── README.md
 ├── pyproject.toml
-├── .env.example              # environment variable template
-├── .env                      # local secrets, ignored by git
-├── run_ui.py                 # manual upload / review UI launcher
-├── run_app.py                # combined launcher for UI + optional Outlook sync
-├── run_inbox.py              # inbox dashboard launcher, requires inbox_app.py
+├── .env.example              # Vorlage — kopieren nach .env
+├── .env                      # gitignored, lokale Secrets
+├── .tunnel_url               # gitignored, von run_review_api.py geschrieben
+│
+├── run_review_api.py         # FastAPI + cloudflared-Launcher (für Add-in)
+├── run_ui.py                 # Streamlit Review-UI Launcher
 │
 ├── data/
-│   └── stammdaten_test.csv
+│   ├── stammdaten_test.csv   # Beispiel-Stammdaten
+│   └── reviews/              # Pro-Review-Artefakte (vom API-Flow)
 │
 ├── docs/
 │   ├── architecture.md
-│   └── decisions/
+│   └── decisions/            # ADRs (no-LLM-in-matching, certs-flat, ...)
 │
-├── samples/
-│   └── README.md
-│
-├── scripts/
-│   ├── smoke_test.py
-│   └── sync_outlook.py
+├── outlook-test-addin/       # Vite + React Outlook Add-in
+│   ├── manifest.xml
+│   └── src/
 │
 ├── src/quoting/
-│   ├── cli.py                # run / batch entry point
-│   ├── pipeline.py           # orchestrator
-│   │
+│   ├── cli.py                # CLI entry point (run / batch)
+│   ├── pipeline.py           # End-to-end orchestrator
+│   ├── api/                  # FastAPI für Outlook Add-in
 │   ├── core/                 # config, logging, schema
-│   ├── ingestion/            # file / mail parsing
-│   ├── extraction/           # LLM extraction
-│   ├── matching/             # deterministic master-data matching
-│   ├── pricing/              # deterministic pricing
-│   ├── output/               # PDF + JSON output
-│   ├── outlook/              # Microsoft Graph / Outlook integration
-│   └── ui/                   # Streamlit apps
-│       └── review_app.py
+│   ├── ingestion/            # .eml / .msg / loose file parsing
+│   ├── extraction/           # LLM extraction (Gemini / Azure)
+│   ├── matching/             # deterministisches Stammdaten-Matching
+│   ├── pricing/              # deterministisches Pricing
+│   ├── output/               # PDF + JSON writer
+│   └── ui/                   # Streamlit Review-App
 │
 └── tests/
     ├── unit/
@@ -93,118 +148,56 @@ quoting-pipeline/
     └── fixtures/
 ```
 
-## Setup
+---
 
-Install the project in editable mode with development dependencies:
+## Architektur-Prinzipien
 
-```bash
-pip install -e ".[dev]"
-```
+- **Extraktion** ist der einzige LLM-Schritt. Provider wählbar via `LLM_PROVIDER`
+  (`gemini` oder `azure`).
+- **Matching** und **Pricing** sind komplett deterministisch — kein LLM, voll
+  auditierbar (siehe `docs/decisions/001-no-llm-in-matching-or-pricing.md`).
+- Die `Mail`-Datenstruktur ist der einzige Input der Pipeline. CLI, API und
+  Tests bauen alle ein `Mail` und übergeben es an `QuotingPipeline.run()`.
+- Zertifikate (`Abnahmeprüfzeugnis 3.1` etc.) sind Pauschal-Aufschläge, kein
+  Stückpreis × Menge (siehe ADR 002).
 
-Create the local environment file:
-
-```bash
-cp .env.example .env
-```
-
-Then edit `.env` and add the required API keys.
-
-## How to start the app
-
-### Manual upload / review UI
-
-Use this for local testing with PDF, EML, XLSX or CSV files:
-
-```bash
-streamlit run run_ui.py
-```
-
-Alternative:
-
-```bash
-python run_app.py --app review --no-sync
-```
-
-### Combined launcher with Outlook sync
-
-Only use this if the Outlook integration is configured and the inbox UI exists:
-
-```bash
-python run_app.py
-```
-
-Required Outlook environment variables:
-
-```bash
-AZURE_TENANT_ID=
-AZURE_CLIENT_ID=
-AZURE_CLIENT_SECRET=
-OUTLOOK_MAILBOX=
-```
-
-Optional Outlook variables:
-
-```bash
-OUTLOOK_FOLDER=Inbox
-OUTLOOK_PROCESSED_FOLDER=AI-Processed
-OUTLOOK_POLL_SECONDS=60
-OUTLOOK_MAX_FETCH=25
-OUTLOOK_STORE_DIR=./data/outlook_cache
-```
-
-Note: `run_app.py` defaults to the inbox dashboard. This requires:
-
-```text
-src/quoting/ui/inbox_app.py
-```
-
-If that file is not present, start the review UI instead:
-
-```bash
-python run_app.py --app review --no-sync
-```
-
-## CLI usage
-
-Process one file:
-
-```bash
-python -m quoting.cli run path/to/rfq.pdf
-```
-
-Process a folder:
-
-```bash
-python -m quoting.cli batch ./inbox --output ./results
-```
-
-Supported input files:
-
-```text
-.pdf
-.eml
-.xlsx
-.xls
-.csv
-```
+---
 
 ## Tests
 
-Run all tests:
-
 ```bash
-pytest
+pytest                  # alle
+pytest tests/unit       # nur Unit
+pytest tests/integration
 ```
 
-Run only unit tests:
+---
 
-```bash
-pytest tests/unit
-```
+## Troubleshooting
+
+**Add-in zeigt "PDF URL check failed: Failed to fetch"**
+Der cloudflared-Tunnel ist nicht erreichbar oder `.tunnel_url` enthält eine
+veraltete URL. Lösung: `run_review_api.py` neu starten — die Datei wird beim
+Start gelöscht und mit der neuen URL überschrieben.
+
+**Add-in: "Draft Quotation erstellen" → kein neues Mail-Fenster öffnet sich**
+Das passiert auf dem "neuen" Outlook für Mac und manchen Web-Versionen. Das
+Compose-Fenster geht oft im Hintergrund auf — Dock / Taskleiste prüfen.
+Alternativ Outlook Classic verwenden.
+
+**Cloudflared Quick-Tunnel-URL ändert sich bei jedem Neustart**
+Das ist Designentscheidung von Cloudflare für Quick Tunnels. `.tunnel_url`
+hält die jeweils aktuelle URL aktuell — die API liest sie pro Request.
+Für eine permanente URL einen *Named Tunnel* einrichten und den Pfad zur
+`config.yml` über `CLOUDFLARED_CONFIG` setzen.
+
+**Stammdaten nicht gefunden**
+Wenn `data/stammdaten_test.csv` fehlt, fällt das Matching auf eingebettete
+Mock-Daten zurück (siehe `matching/stammdaten.py`).
+
+---
 
 ## Notes
 
-- Extraction uses an LLM provider configured via `.env`.
-- Matching and pricing are deterministic and do not use an LLM.
-- Generated outputs are written to `OUTPUT_DIR`.
-- Local secrets belong in `.env`, not in version control.
+- Outputs landen unter `OUTPUT_DIR` (CLI) bzw. `data/reviews/<id>/` (API).
+- Alle Secrets gehören in `.env`, niemals ins Repo.

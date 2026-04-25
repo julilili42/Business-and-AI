@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import uuid
 from pathlib import Path
 
@@ -10,33 +11,50 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-import os
+from quoting.ingestion import Mail
 from quoting.pipeline import QuotingPipeline
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 REVIEW_DIR = PROJECT_ROOT / "data" / "reviews"
+TUNNEL_FILE = PROJECT_ROOT / ".tunnel_url"
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 STREAMLIT_BASE_URL = os.getenv("STREAMLIT_BASE_URL", "http://localhost:8501")
+
+
+def _api_base_url() -> str:
+    """Resolve the public base URL the add-in should hit.
+
+    Priority:
+      1. <project>/.tunnel_url written by run_review_api.py at runtime
+         (always reflects the *current* cloudflared tunnel)
+      2. API_BASE_URL from environment (.env fallback)
+      3. http://127.0.0.1:8000 (local dev)
+
+    Read on every request so a tunnel restart is picked up without
+    bouncing the API.
+    """
+    try:
+        if TUNNEL_FILE.exists():
+            url = TUNNEL_FILE.read_text(encoding="utf-8").strip()
+            if url:
+                return url
+    except Exception:
+        # Don't let a transient FS hiccup break the request.
+        pass
+    return os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
 
 app = FastAPI(title="Quoting Pipeline API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://localhost:5173",
-        "http://localhost:5173",
-        "https://outlook.office.com",
-        "https://outlook.office365.com",
-        "https://outlook.live.com",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Pipeline einmal initialisieren — Stammdaten werden gecached
+# Pipeline once — stammdaten cached
 _pipeline = QuotingPipeline()
 
 
@@ -59,7 +77,7 @@ class MailReviewRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    return {"ok": True, "api_base_url": _api_base_url()}
 
 
 @app.post("/api/reviews")
@@ -68,7 +86,7 @@ def create_review(payload: MailReviewRequest):
     folder = REVIEW_DIR / review_id
     folder.mkdir(parents=True, exist_ok=True)
 
-    # 1. Mail-Metadaten speichern (ohne base64-Blobs, damit mail.json lesbar bleibt)
+    # 1. Persist mail metadata (without base64 blobs so mail.json stays readable)
     meta = payload.model_dump(by_alias=True, exclude={"attachments"})
     meta["attachments"] = [
         {k: v for k, v in a.model_dump().items() if k != "contentBase64"}
@@ -79,7 +97,7 @@ def create_review(payload: MailReviewRequest):
         encoding="utf-8",
     )
 
-    # 2. Attachments als Dateien rausschreiben
+    # 2. Materialize attachments as files (pipeline reads from disk)
     saved_paths: list[Path] = []
     for att in payload.attachments:
         if not att.contentBase64:
@@ -92,31 +110,37 @@ def create_review(payload: MailReviewRequest):
             raise HTTPException(400, f"Bad base64 in attachment '{att.name}': {e}")
         saved_paths.append(target)
 
-    # 3. Pipeline-Input wählen — erstes PDF gewinnt
-    pdf_inputs = [p for p in saved_paths if p.suffix.lower() == ".pdf"]
-    if not pdf_inputs:
+    # 3. Build a generic Mail — pipeline decides what to do with body + attachments.
+    mail = Mail(
+        subject=payload.subject,
+        sender=payload.sender,
+        body=payload.body,
+        attachments=saved_paths,
+    )
+
+    if not mail.has_content:
         raise HTTPException(
             status_code=400,
-            detail="No PDF attachment found in mail. Pipeline expects a PDF RFQ.",
+            detail="Mail has neither body text nor attachments — nothing to extract.",
         )
 
-    rfq_pdf = pdf_inputs[0]
-
-    # 4. Pipeline laufen lassen — Output landet in folder/<stem>/...
+    # 4. Run the pipeline. Output goes into the review folder.
     try:
         result = _pipeline.run(
-            input_path=rfq_pdf,
+            mail,
             output_dir=folder,
-            mail_body=payload.body,
+            work_name="pipeline",
         )
     except Exception as e:
         raise HTTPException(500, f"Pipeline failed: {e}")
 
-    # 5. URL für die generierte Draft-PDF zurückgeben
+    # Resolve the live base URL right now — not at import time.
+    api_base = _api_base_url()
+
     return {
         "review_id": review_id,
         "review_url": f"{STREAMLIT_BASE_URL}?review_id={review_id}",
-        "draft_pdf_url": f"{API_BASE_URL}/api/reviews/{review_id}/pdf",
+        "draft_pdf_url": f"{api_base}/api/reviews/{review_id}/pdf",
         "draft_pdf_filename": f"Angebot_Draft_{review_id}.pdf",
         "summary": result.summary(),
     }
@@ -137,5 +161,8 @@ def get_review_pdf(review_id: str):
         pdf,
         media_type="application/pdf",
         filename=f"Angebot_Draft_{review_id}.pdf",
-        headers={"Cache-Control": "public, max-age=300"},
+        headers={
+            "Cache-Control": "public, max-age=300",
+            "Access-Control-Allow-Origin": "*",
+        },
     )

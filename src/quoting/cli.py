@@ -13,11 +13,20 @@ import sys
 from pathlib import Path
 
 from .core import get_logger, load_settings
+from .ingestion import Mail, detect_file_type, mail_from_file, parse_mail
 from .pipeline import QuotingPipeline
 
 log = get_logger()
 
-_SUPPORTED_EXT = {".pdf", ".eml", ".xlsx", ".xls", ".csv"}
+_SUPPORTED_EXT = {".pdf", ".eml", ".msg", ".xlsx", ".xls", ".csv"}
+
+
+def _build_mail(input_path: Path) -> Mail:
+    """Wrap the input file as a Mail."""
+    file_type = detect_file_type(input_path)
+    if file_type in ("eml", "msg"):
+        return parse_mail(input_path)
+    return mail_from_file(input_path)
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
@@ -28,7 +37,12 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
     pipeline = QuotingPipeline(load_settings())
     try:
-        result = pipeline.run(input_path, Path(args.output) if args.output else None)
+        mail = _build_mail(input_path)
+        result = pipeline.run(
+            mail,
+            output_dir=Path(args.output) if args.output else None,
+            work_name=input_path.stem,
+        )
     except Exception as exc:
         log.exception("Pipeline failed: %s", exc)
         return 2
@@ -55,9 +69,11 @@ def _cmd_batch(args: argparse.Namespace) -> int:
     log.info("Batch: %d file(s)", len(files))
     summaries: list[dict] = []
     failed = 0
+
     for f in files:
         try:
-            res = pipeline.run(f, output)
+            mail = _build_mail(f)
+            res = pipeline.run(mail, output_dir=output, work_name=f.stem)
             summaries.append(res.summary())
         except Exception as exc:
             failed += 1
@@ -77,7 +93,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_run = sub.add_parser("run", help="process a single RFQ file")
-    p_run.add_argument("input", help="path to PDF / EML / XLSX / CSV")
+    p_run.add_argument("input", help="path to PDF / EML / MSG / XLSX / CSV")
     p_run.add_argument("-o", "--output", help="output directory")
     p_run.set_defaults(func=_cmd_run)
 
