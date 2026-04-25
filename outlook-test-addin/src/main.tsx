@@ -286,47 +286,122 @@ function App() {
     });
   }, []);
 
-  return (
-    <div className="panel">
-      <h1>Quotation Review</h1>
-      <p className="muted">
-        Liest die aktuell geöffnete Outlook-Mail und startet den Review-Flow.
-      </p>
+  const hasPdf = snapshot?.attachments.some((a) =>
+  a.name.toLowerCase().endsWith(".pdf")
+);
 
-      <button disabled={!isOutlook || loading} onClick={loadMail}>
-        Mail anzeigen
-      </button>
+const statusClass =
+  status.toLowerCase().includes("error") || status.toLowerCase().includes("failed")
+    ? "error"
+    : status.toLowerCase().includes("created") ||
+        status.toLowerCase().includes("called") ||
+        status.toLowerCase().includes("loaded")
+      ? "success"
+      : loading
+        ? "loading"
+        : "idle";
 
-      <button disabled={!isOutlook || loading} onClick={startReview}>
-        Draft Quotation erstellen
-      </button>
+return (
+  <div className="panel">
+    <header className="app-header">
+      <div className="logo-mark">EK</div>
+      <div>
+        <h1>Quotation Review</h1>
+        <p className="muted">Angebot aus der aktuellen Outlook-Mail erstellen</p>
+      </div>
+    </header>
 
-      <section>
-        <h2>Status</h2>
-        <pre>{status}</pre>
-      </section>
+    <section className="card">
+      <div className="card-title">Aktuelle Mail</div>
 
-      <section>
-        <h2>Subject</h2>
-        <pre>{snapshot?.subject || "(not loaded)"}</pre>
-      </section>
+      <div className="mail-title">
+        {snapshot?.subject || "Noch keine Mail geladen"}
+      </div>
 
-      <section>
-        <h2>From</h2>
-        <pre>{snapshot?.from || "-"}</pre>
-      </section>
+      <div className="info-row">
+        <span className="info-label">Absender</span>
+        <span className="info-value">{snapshot?.from || "-"}</span>
+      </div>
 
-      <section>
-        <h2>Body</h2>
+      <div className="info-row">
+        <span className="info-label">Anhänge</span>
+        <span className="info-value">
+          {snapshot ? `${snapshot.attachments.length}` : "-"}
+        </span>
+      </div>
+
+      <div className="info-row">
+        <span className="info-label">PDF gefunden</span>
+        <span className="info-value">{hasPdf ? "Ja" : "Nein"}</span>
+      </div>
+
+      <div className="actions">
+        <button
+          className="primary-button"
+          disabled={!isOutlook || loading || !snapshot}
+          onClick={startReview}
+        >
+          Draft Quotation erstellen
+        </button>
+
+        <button
+          className="secondary-button"
+          disabled={!isOutlook || loading}
+          onClick={loadMail}
+        >
+          Mail neu laden
+        </button>
+      </div>
+    </section>
+
+    <section className="card">
+      <div className="card-title">Status</div>
+      <div className={`status ${statusClass}`}>{status}</div>
+    </section>
+
+    <section className="card">
+      <div className="card-title">Anhänge</div>
+
+      {snapshot?.attachments.length ? (
+        <div className="attachment-list">
+          {snapshot.attachments.map((att, index) => (
+            <div className="attachment-pill" key={`${att.id}-${index}`}>
+              <div className="attachment-icon">
+                {att.name.toLowerCase().endsWith(".pdf") ? "PDF" : "FILE"}
+              </div>
+              <div>
+                <div className="attachment-name">{att.name}</div>
+                <div className="attachment-meta">
+                  {att.contentType || "unknown"} · {Math.round(att.size / 1024)} KB
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="muted">Keine Anhänge geladen.</p>
+      )}
+    </section>
+
+    <details>
+      <summary>Debug-Details anzeigen</summary>
+
+      <section className="card">
+        <div className="card-title">Body</div>
         <pre>{snapshot?.body || "(not loaded)"}</pre>
       </section>
 
-      <section>
-        <h2>Attachments</h2>
+      <section className="card">
+        <div className="card-title">Raw Attachments</div>
         <pre>{snapshot ? formatAttachments(snapshot.attachments) : "(not loaded)"}</pre>
       </section>
+    </details>
+
+    <div className="footer-note">
+      ElringKlinger Quoting Pipeline · Local Prototype
     </div>
-  );
+  </div>
+);
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
