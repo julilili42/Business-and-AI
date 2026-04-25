@@ -18,17 +18,36 @@ def render_matching(anfrage: Anfrage, fuzzy_threshold: int):
         semantic_threshold=settings().semantic_threshold,
     )
 
-    m_cols = st.columns(len(anfrage.positionen) if anfrage.positionen else 1)
+    exact = sum(1 for m in matches if m.status == "exact")
+    fuzzy = sum(1 for m in matches if m.status == "fuzzy")
+    semantic = sum(1 for m in matches if m.status == "semantic")
+    no_match = sum(1 for m in matches if m.status == "no_match")
 
-    for i, (pos, match) in enumerate(zip(anfrage.positionen, matches)):
-        with m_cols[i]:
-            color = "normal" if match.score > 0.8 else "inverse"
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Exact", exact)
+    c2.metric("Fuzzy", fuzzy)
+    c3.metric("Semantic", semantic)
+    c4.metric("No Match", no_match)
 
-            st.metric(
-                f"Pos {pos.pos_nr}",
-                f"{match.score:.0%}",
-                match.status.upper(),
-                delta_color=color,
-            )
+    rows = []
+
+    for pos, match in zip(anfrage.positionen, matches):
+        rows.append(
+            {
+                "Pos": pos.pos_nr,
+                "Anfrage Artikel": pos.artikelnummer,
+                "Status": match.status.upper(),
+                "Score": f"{match.score:.0%}",
+                "Treffer Artikel": match.matched_artikelnr or "—",
+                "Treffer Bezeichnung": match.matched_bezeichnung or "—",
+            }
+        )
+
+    if rows:
+        st.dataframe(
+            rows,
+            use_container_width=True,
+            hide_index=True,
+        )
 
     return matches

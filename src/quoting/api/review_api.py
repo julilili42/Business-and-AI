@@ -149,20 +149,40 @@ def create_review(payload: MailReviewRequest):
 @app.get("/api/reviews/{review_id}/pdf")
 def get_review_pdf(review_id: str):
     folder = REVIEW_DIR / review_id
+
     if not folder.exists():
         raise HTTPException(404, f"Review {review_id} not found")
 
+    preferred = [
+        folder / f"Angebot_Draft_{review_id}.pdf",
+        folder / "draft_angebot.pdf",
+    ]
+
+    for pdf in preferred:
+        if pdf.exists():
+            return FileResponse(
+                pdf,
+                media_type="application/pdf",
+                filename=f"Angebot_Draft_{review_id}.pdf",
+                headers={
+                    "Cache-Control": "no-store",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            )
+
     candidates = list(folder.rglob("*_ANGEBOT_DRAFT.pdf"))
+
     if not candidates:
         raise HTTPException(404, "Draft PDF not generated for this review")
 
     pdf = candidates[0]
+
     return FileResponse(
         pdf,
         media_type="application/pdf",
         filename=f"Angebot_Draft_{review_id}.pdf",
         headers={
-            "Cache-Control": "public, max-age=300",
+            "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
         },
     )

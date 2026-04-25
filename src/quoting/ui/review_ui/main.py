@@ -10,7 +10,6 @@ def _ensure_project_path() -> None:
     """Allow running this file directly via streamlit."""
     this_file = Path(__file__).resolve()
 
-    # src/quoting/ui/review_ui/main.py
     project_root = this_file.parents[4]
     src_dir = this_file.parents[3]
 
@@ -38,21 +37,60 @@ def run() -> None:
     from quoting.ui.review_ui.extraction import detect_and_store_agent_language, load_anfrage_once
     from quoting.ui.review_ui.layout import apply_style, render_header, render_sidebar
     from quoting.ui.review_ui.matching_view import render_matching
-    from quoting.ui.review_ui.quotation_flow import render_generate_button
+    from quoting.ui.review_ui.quotation_flow import (
+        hydrate_existing_review_state,
+        render_generate_button,
+    )
+    from quoting.ui.review_ui.review_context import (
+        ReviewInput,
+        get_review_id_from_query,
+        load_review_input,
+        store_review_context,
+    )
+    from quoting.ui.review_ui.review_overview import (
+        render_review_overview,
+        render_review_title,
+    )
     from quoting.ui.review_ui.upload import handle_upload
 
     apply_style()
     render_header()
 
-    uploaded, fuzzy_threshold = render_sidebar()
+    review_id = get_review_id_from_query()
+    uploaded, fuzzy_threshold = render_sidebar(review_id=review_id)
 
-    st.markdown('<h1 class="main-header">📋 Angebots-Review</h1>', unsafe_allow_html=True)
+    if review_id:
+        try:
+            review_input = load_review_input(review_id)
+        except Exception as e:
+            st.error(f"❌ Review konnte nicht geladen werden: {e}")
+            st.stop()
 
-    if not uploaded:
-        st.info("Bitte laden Sie links eine Preisanfrage hoch, um zu beginnen.")
-        st.stop()
+        store_review_context(review_input)
 
-    input_path, content_hash, payload = handle_upload(uploaded)
+        input_path = review_input.input_path
+        content_hash = review_input.content_hash
+        payload = review_input.payload
+        uploaded_name = review_input.uploaded_name
+
+    else:
+        if not uploaded:
+            st.info("Bitte laden Sie links eine Preisanfrage hoch, um zu beginnen.")
+            st.stop()
+
+        input_path, content_hash, payload = handle_upload(uploaded)
+
+        review_input = ReviewInput(
+            input_path=input_path,
+            content_hash=content_hash,
+            payload=payload,
+            uploaded_name=uploaded.name,
+        )
+        store_review_context(review_input)
+
+        uploaded_name = uploaded.name
+
+    render_review_title(review_id, input_path)
 
     try:
         anfrage = load_anfrage_once(content_hash, input_path)
@@ -62,28 +100,60 @@ def run() -> None:
 
     detect_and_store_agent_language(content_hash, input_path, anfrage)
 
-    col_doc, col_extract = st.columns([1, 1], gap="large")
-
-    with col_doc:
-        render_original_request(input_path, payload)
-
-    with col_extract:
-        anfrage = render_editor(anfrage)
-
-    matches = render_matching(anfrage, fuzzy_threshold)
-
-    render_generate_button(
-        anfrage=anfrage,
-        matches=matches,
-        content_hash=content_hash,
-        uploaded_name=uploaded.name,
+    tab_review, tab_offer, tab_agent = st.tabs(
+        [
+            "1️⃣ Anfrage prüfen",
+            "2️⃣ Angebot & Matching",
+            "3️⃣ Agent Chat",
+        ]
     )
 
-    render_agent_chat(
-        anfrage=anfrage,
-        matches=matches,
-        content_hash=content_hash,
-    )
+    with tab_review:
+        col_doc, col_extract = st.columns([1, 1], gap="large")
+
+        with col_doc:
+            render_original_request(input_path, payload)
+
+        with col_extract:
+            anfrage = render_editor(anfrage)
+
+    with tab_offer:
+        matches = render_matching(anfrage, fuzzy_threshold)
+
+        hydrate_existing_review_state(
+            content_hash=content_hash,
+            matches=matches,
+        )
+
+        render_review_overview(
+            review_id=review_id,
+            input_path=input_path,
+            anfrage=anfrage,
+            matches=matches,
+        )
+
+        st.markdown("---")
+
+        render_generate_button(
+            anfrage=anfrage,
+            matches=matches,
+            content_hash=content_hash,
+            uploaded_name=uploaded_name,
+        )
+
+    with tab_agent:
+        matches = render_matching(anfrage, fuzzy_threshold)
+
+        hydrate_existing_review_state(
+            content_hash=content_hash,
+            matches=matches,
+        )
+
+        render_agent_chat(
+            anfrage=anfrage,
+            matches=matches,
+            content_hash=content_hash,
+        )
 
 
 if __name__ == "__main__":

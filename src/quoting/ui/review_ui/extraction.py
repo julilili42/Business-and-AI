@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import streamlit as st
@@ -15,7 +16,11 @@ def load_anfrage_once(content_hash: str, input_path: Path) -> Anfrage:
         reset_editor_state()
         reset_agent_state()
 
-        anfrage_dict = extract_cached(content_hash, str(input_path))
+        anfrage_dict = _load_saved_anfrage_dict()
+
+        if anfrage_dict is None:
+            anfrage_dict = extract_cached(content_hash, str(input_path))
+            st.session_state["loaded_extraction_source"] = "neu extrahiert"
 
         st.session_state["anfrage"] = Anfrage.model_validate(anfrage_dict)
         st.session_state["anfrage_hash"] = content_hash
@@ -47,3 +52,72 @@ def detect_and_store_agent_language(
         st.session_state["agent_lang_hash"] = content_hash
 
     return st.session_state.get("agent_lang", "de")
+
+
+def _load_saved_anfrage_dict() -> dict | None:
+    review_dir_raw = st.session_state.get("review_dir")
+
+    if not review_dir_raw:
+        return None
+
+    review_dir = Path(review_dir_raw)
+
+    candidate_paths = [
+        review_dir / "anfrage_reviewed.json",
+        review_dir / "anfrage.json",
+        review_dir / "extracted_anfrage.json",
+        review_dir / "extraction.json",
+        review_dir / "pipeline" / "01_extracted.json",
+    ]
+
+    candidate_paths.extend(sorted(review_dir.rglob("01_extracted.json")))
+
+    seen: set[Path] = set()
+
+    for path in candidate_paths:
+        path = path.resolve()
+
+        if path in seen:
+            continue
+
+        seen.add(path)
+
+        if not path.exists():
+            continue
+
+        data = _read_json(path)
+
+        if not isinstance(data, dict):
+            continue
+
+        normalized = _unwrap_anfrage_dict(data)
+
+        if normalized is not None:
+            try:
+                st.session_state["loaded_extraction_source"] = str(path.relative_to(review_dir))
+            except ValueError:
+                st.session_state["loaded_extraction_source"] = str(path)
+
+            return normalized
+
+    return None
+
+
+def _read_json(path: Path) -> dict | list | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _unwrap_anfrage_dict(data: dict) -> dict | None:
+    if "positionen" in data and isinstance(data["positionen"], list):
+        return data
+
+    for key in ("anfrage", "request", "data"):
+        nested = data.get(key)
+
+        if isinstance(nested, dict) and "positionen" in nested:
+            return nested
+
+    return None
