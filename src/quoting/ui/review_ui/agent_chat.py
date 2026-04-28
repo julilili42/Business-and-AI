@@ -1,3 +1,4 @@
+"""Agent chat panel — natural-language commercial edits on the quotation."""
 from __future__ import annotations
 
 import streamlit as st
@@ -17,28 +18,40 @@ def render_agent_chat(
     matches,
     content_hash: str,
 ) -> None:
+    """Render the agent chat. Requires a generated quotation in state."""
     if st.session_state.get("quotation_hash") != content_hash:
         return
-
     if not st.session_state.get("quotation"):
         return
 
-    st.markdown("---")
-    st.subheader("💬 Agent Chat")
+    st.markdown(
+        '<div class="ek-section-label">Agent-Chat · Anpassungen in Klartext</div>',
+        unsafe_allow_html=True,
+    )
 
     agent_lang = st.session_state.get("agent_lang", "de")
     messages = st.session_state.setdefault("agent_messages", [])
+
+    # Empty-state primer
+    if not messages:
+        intro = (
+            "Try: *Discount 5% on article ABC*, *Set pos 3 to 12 EUR*, "
+            "*What is the total?*"
+            if agent_lang == "en"
+            else "Beispiele: *5% Rabatt auf Artikel ABC*, *Setze pos 3 auf 12 EUR*, "
+            "*Wie hoch ist die Summe?*"
+        )
+        st.info(intro, icon="💡")
 
     for msg in messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
     chat_placeholder = (
-        "Write an edit: discount by position/article, comment, or total question"
-        if agent_lang == "en"
-        else "Schreibe eine Anpassung: Rabatt je Position/Artikel, Kommentar oder Summenfrage"
+        "Schreibe eine Anpassung: Rabatt je Position/Artikel, Kommentar oder Summenfrage"
+        if agent_lang == "de"
+        else "Write an edit: discount by position/article, comment, or total question"
     )
-
     user_msg = st.chat_input(chat_placeholder)
 
     if user_msg:
@@ -52,8 +65,9 @@ def render_agent_chat(
         )
 
     if st.session_state.get("pdf_bytes"):
+        st.markdown("&nbsp;", unsafe_allow_html=True)
         st.download_button(
-            label="📥 PDF herunterladen nach dem Korrigieren",
+            label="📥 Aktuelles PDF herunterladen",
             data=st.session_state["pdf_bytes"],
             file_name=st.session_state.get(
                 "pdf_file_name",
@@ -73,39 +87,28 @@ def _handle_agent_message(
     agent_lang: str,
     messages: list[dict],
 ) -> None:
-    messages.append(
-        {
-            "role": "user",
-            "content": user_msg,
-        }
-    )
+    """Dispatch a chat message to the parser, apply overrides if any."""
+    messages.append({"role": "user", "content": user_msg})
 
     current_quotation = st.session_state["quotation"]
-
     known_articles = [
-        p.artikelnummer
-        for p in anfrage.positionen
-        if p.artikelnummer
+        p.artikelnummer for p in anfrage.positionen if p.artikelnummer
     ]
 
     parsed_override, parse_feedback = parse_edit_instruction(
-        user_msg,
-        known_articles,
-        lang=agent_lang,
+        user_msg, known_articles, lang=agent_lang
     )
 
     if parsed_override:
         overrides = st.session_state.get("manual_discount_overrides", [])
-
         st.session_state["manual_discount_overrides"] = upsert_override(
-            overrides,
-            parsed_override,
+            overrides, parsed_override
         )
 
         spinner_text = (
-            "Applying edit and recalculating PDF..."
-            if agent_lang == "en"
-            else "Anpassung wird angewendet und PDF neu berechnet..."
+            "Anpassung wird angewendet und PDF neu berechnet..."
+            if agent_lang == "de"
+            else "Applying edit and recalculating PDF..."
         )
 
         with st.spinner(spinner_text):
@@ -116,55 +119,35 @@ def _handle_agent_message(
                     content_hash=content_hash,
                     agent_lang=agent_lang,
                 )
-
             except Exception as e:
-                messages.append(
-                    {
-                        "role": "assistant",
-                        "content": (
-                            f"Could not apply edit: {e}"
-                            if agent_lang == "en"
-                            else f"Anpassung konnte nicht angewendet werden: {e}"
-                        ),
-                    }
+                err = (
+                    f"Anpassung konnte nicht angewendet werden: {e}"
+                    if agent_lang == "de"
+                    else f"Could not apply edit: {e}"
                 )
+                messages.append({"role": "assistant", "content": err})
                 st.rerun()
 
-        messages.append(
-            {
-                "role": "assistant",
-                "content": (
-                    f"{parse_feedback}\n\n"
-                    + build_agent_summary(
-                        quotation,
-                        matches,
-                        applied_items=applied_items,
-                        lang=agent_lang,
-                    )
-                ),
-            }
-        )
-
+        messages.append({
+            "role": "assistant",
+            "content": (
+                f"{parse_feedback}\n\n"
+                + build_agent_summary(
+                    quotation, matches,
+                    applied_items=applied_items, lang=agent_lang,
+                )
+            ),
+        })
         st.rerun()
 
     if parse_feedback:
-        messages.append(
-            {
-                "role": "assistant",
-                "content": parse_feedback,
-            }
-        )
+        messages.append({"role": "assistant", "content": parse_feedback})
         st.rerun()
 
-    messages.append(
-        {
-            "role": "assistant",
-            "content": build_general_agent_reply(
-                user_msg,
-                current_quotation,
-                lang=agent_lang,
-            ),
-        }
-    )
-
+    messages.append({
+        "role": "assistant",
+        "content": build_general_agent_reply(
+            user_msg, current_quotation, lang=agent_lang
+        ),
+    })
     st.rerun()

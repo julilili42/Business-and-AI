@@ -7,15 +7,16 @@
   xsi:type="MailApp">
 
   <Id>8d3e8c5d-3e7a-4d4b-b7d9-5e4a8d0f1001</Id>
-  <Version>1.0.0.0</Version>
+  <Version>1.2.0.0</Version>
   <ProviderName>Business and AI</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="TEST Quotation Add-in"/>
-  <Description DefaultValue="Shows the currently opened Outlook mail in a test panel."/>
 
-  <IconUrl DefaultValue="https://localhost:5173/assets/icon-64.png"/>
-  <HighResolutionIconUrl DefaultValue="https://localhost:5173/assets/icon-128.png"/>
-  <SupportUrl DefaultValue="https://localhost:5173"/>
+  <DisplayName DefaultValue="Quotation Assistant"/>
+  <Description DefaultValue="Analyze RFQs and generate draft quotations directly inside Outlook."/>
+
+  <IconUrl DefaultValue="https://your-domain.com/assets/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://your-domain.com/assets/icon-128.png"/>
+  <SupportUrl DefaultValue="https://your-domain.com"/>
 
   <Hosts>
     <Host Name="Mailbox"/>
@@ -27,19 +28,11 @@
     </Sets>
   </Requirements>
 
-  <FormSettings>
-    <Form xsi:type="ItemRead">
-      <DesktopSettings>
-        <SourceLocation DefaultValue="https://localhost:5173/index.html"/>
-        <RequestedHeight>450</RequestedHeight>
-      </DesktopSettings>
-    </Form>
-  </FormSettings>
-
-  <Permissions>ReadItem</Permissions>
+  <Permissions>ReadWriteItem</Permissions>
 
   <Rule xsi:type="RuleCollection" Mode="Or">
     <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit"/>
   </Rule>
 
   <DisableEntityHighlighting>false</DisableEntityHighlighting>
@@ -57,14 +50,16 @@
     <Hosts>
       <Host xsi:type="MailHost">
         <DesktopFormFactor>
+
           <FunctionFile resid="Commands.Url"/>
 
+          <!-- READ MODE -->
           <ExtensionPoint xsi:type="MessageReadCommandSurface">
             <OfficeTab id="TabDefault">
-              <Group id="testGroup">
+              <Group id="quoteGroupRead">
                 <Label resid="Group.Label"/>
 
-                <Control xsi:type="Button" id="testOpenPaneButton">
+                <Control xsi:type="Button" id="openPaneRead">
                   <Label resid="TaskpaneButton.Label"/>
                   <Supertip>
                     <Title resid="TaskpaneButton.Label"/>
@@ -84,32 +79,60 @@
               </Group>
             </OfficeTab>
           </ExtensionPoint>
+
+          <!-- COMPOSE MODE -->
+          <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="quoteGroupCompose">
+                <Label resid="Group.Label"/>
+
+                <Control xsi:type="Button" id="openPaneCompose">
+                  <Label resid="TaskpaneButton.Label"/>
+                  <Supertip>
+                    <Title resid="TaskpaneButton.Label"/>
+                    <Description resid="TaskpaneButton.Tooltip"/>
+                  </Supertip>
+
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
         </DesktopFormFactor>
       </Host>
     </Hosts>
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:5173/assets/icon-16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:5173/assets/icon-32.png"/>
-        <bt:Image id="Icon.64x64" DefaultValue="https://localhost:5173/assets/icon-64.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:5173/assets/icon-80.png"/>
-        <bt:Image id="Icon.128x128" DefaultValue="https://localhost:5173/assets/icon-128.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://your-domain.com/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://your-domain.com/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://your-domain.com/assets/icon-80.png"/>
+        <bt:Image id="Icon.128x128" DefaultValue="https://your-domain.com/assets/icon-128.png"/>
       </bt:Images>
 
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://localhost:5173/index.html"/>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5173/index.html"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://your-domain.com/index.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://your-domain.com/index.html"/>
       </bt:Urls>
 
       <bt:ShortStrings>
-        <bt:String id="Group.Label" DefaultValue="Quotation"/>
-        <bt:String id="TaskpaneButton.Label" DefaultValue="TEST"/>
+        <bt:String id="Group.Label" DefaultValue="Quoting"/>
+        <bt:String id="TaskpaneButton.Label" DefaultValue="Create Quote"/>
       </bt:ShortStrings>
 
       <bt:LongStrings>
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open TEST panel and show this mail."/>
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Analyze RFQ and generate a draft quotation."/>
       </bt:LongStrings>
     </Resources>
+
   </VersionOverrides>
 </OfficeApp>
