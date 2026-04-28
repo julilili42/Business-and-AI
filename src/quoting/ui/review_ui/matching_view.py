@@ -59,10 +59,6 @@ def render_matching(anfrage: Anfrage, fuzzy_threshold: int):
         })
 
     if rows:
-        st.dataframe(
-            rows,
-            use_container_width=True,
-            hide_index=True,
-        )
+        st.dataframe(rows, use_container_width=True, hide_index=True)
 
     return matches

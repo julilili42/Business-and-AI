@@ -7,13 +7,7 @@ import streamlit as st
 
 
 EDITOR_KEY_PREFIXES = (
-    "art_",
-    "mng_",
-    "eh_",
-    "lt_",
-    "ws_",
-    "zn_",
-    "bez_",
+    "art_", "mng_", "eh_", "lt_", "ws_", "zn_", "bez_",
 )
 
 

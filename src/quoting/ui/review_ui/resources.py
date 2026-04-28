@@ -22,10 +22,8 @@ def stammdaten():
 
 def build_mail(input_path: Path) -> Mail:
     typ = detect_file_type(input_path)
-
     if typ in ("eml", "msg"):
         return parse_mail(input_path)
-
     return mail_from_file(input_path)
 
 
@@ -33,18 +31,14 @@ def build_mail(input_path: Path) -> Mail:
 def extract_cached(content_hash: str, file_path: str) -> dict:
     """Extract Anfrage from a Mail built from file_path. Cached by content_hash."""
     _ = content_hash
-
     mail = build_mail(Path(file_path))
     anfrage = extract_anfrage(mail.attachments, mail.body, settings())
-
     return anfrage.model_dump(mode="json")
 
 
 @st.cache_data
 def mail_body_cached(file_path: str) -> str:
     p = Path(file_path)
-
     if detect_file_type(p) in ("eml", "msg"):
         return parse_mail(p).body or ""
-
     return ""

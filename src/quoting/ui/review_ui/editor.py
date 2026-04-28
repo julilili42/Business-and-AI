@@ -12,9 +12,9 @@ from quoting.core import Anfrage
 
 
 _CONFIDENCE_META = {
-    "high":   {"icon": "🟢", "label": "Hohe Sicherheit",   "tone": "success"},
-    "medium": {"icon": "🟡", "label": "Mittlere Sicherheit","tone": "warning"},
-    "low":    {"icon": "🔴", "label": "Geringe Sicherheit", "tone": "danger"},
+    "high":   {"icon": "🟢", "label": "Hohe Sicherheit",    "tone": "success"},
+    "medium": {"icon": "🟡", "label": "Mittlere Sicherheit", "tone": "warning"},
+    "low":    {"icon": "🔴", "label": "Geringe Sicherheit",  "tone": "danger"},
 }
 
 
@@ -67,46 +67,31 @@ def _position_block(anfrage: Anfrage) -> list:
 
         with st.expander(label):
             st.caption(f"KI-Sicherheit: **{meta['label']}**")
-
             c1, c2 = st.columns(2)
+
             with c1:
                 pos.artikelnummer = st.text_input(
-                    "Artikelnummer",
-                    pos.artikelnummer,
-                    key=f"art_{i}",
+                    "Artikelnummer", pos.artikelnummer, key=f"art_{i}",
                 )
                 pos.menge = st.number_input(
-                    "Menge",
-                    value=float(pos.menge),
-                    key=f"mng_{i}",
+                    "Menge", value=float(pos.menge), key=f"mng_{i}",
                 )
                 pos.einheit = st.text_input(
-                    "Einheit",
-                    pos.einheit,
-                    key=f"eh_{i}",
+                    "Einheit", pos.einheit, key=f"eh_{i}",
                 )
             with c2:
                 pos.liefertermin = st.text_input(
-                    "Liefertermin",
-                    pos.liefertermin or "",
-                    key=f"lt_{i}",
+                    "Liefertermin", pos.liefertermin or "", key=f"lt_{i}",
                 )
                 pos.werkstoff = st.text_input(
-                    "Werkstoff",
-                    pos.werkstoff or "",
-                    key=f"ws_{i}",
+                    "Werkstoff", pos.werkstoff or "", key=f"ws_{i}",
                 )
                 pos.zeichnungsnummer = st.text_input(
-                    "Zeichnungs-Nr.",
-                    pos.zeichnungsnummer or "",
-                    key=f"zn_{i}",
+                    "Zeichnungs-Nr.", pos.zeichnungsnummer or "", key=f"zn_{i}",
                 )
 
             pos.bezeichnung = st.text_area(
-                "Bezeichnung",
-                pos.bezeichnung,
-                key=f"bez_{i}",
-                height=72,
+                "Bezeichnung", pos.bezeichnung, key=f"bez_{i}", height=72,
             )
 
             if pos.source_quote:
@@ -116,6 +101,7 @@ def _position_block(anfrage: Anfrage) -> list:
                 )
 
         edited_positions.append(pos)
+
     return edited_positions
 
 

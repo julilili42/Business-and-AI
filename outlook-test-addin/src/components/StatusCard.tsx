@@ -1,4 +1,11 @@
+/**
+ * StatusCard — single-line, semantically-classified status banner.
+ *
+ * Classification is keyword-based and intentionally conservative: any
+ * unrecognised string falls into "idle" rather than misclassifying.
+ */
 import type { ComponentType, SVGProps } from "react";
+
 import { AlertIcon, CheckIcon, ClockIcon, RefreshIcon } from "./Icons";
 
 type StatusCardProps = {
@@ -10,14 +17,18 @@ type StatusKind = "idle" | "loading" | "success" | "error";
 
 function classify(status: string, loading: boolean): StatusKind {
   const s = status.toLowerCase();
-  if (s.includes("error") || s.includes("failed") || s.includes("fehler"))
+  if (
+    s.includes("error") ||
+    s.includes("failed") ||
+    s.includes("fehler")
+  )
     return "error";
   if (
-    s.includes("created") ||
-    s.includes("loaded") ||
-    s.includes("called") ||
+    s.includes("erstellt") ||
     s.includes("geöffnet") ||
-    s.includes("erfolgreich")
+    s.includes("erfolgreich") ||
+    s.includes("geladen") ||
+    s.includes("versendet")
   )
     return "success";
   if (loading) return "loading";
@@ -36,9 +47,12 @@ const ICONS: Record<StatusKind, IconComp> = {
 export function StatusCard({ status, loading }: StatusCardProps) {
   const kind = classify(status, loading);
   const IconComp = ICONS[kind];
-
   return (
-    <div className={`status status-${kind}`} role="status" aria-live="polite">
+    <div
+      className={`status status-${kind}`}
+      role="status"
+      aria-live="polite"
+    >
       <IconComp className="status-icon" />
       <div className="status-text">{status}</div>
     </div>

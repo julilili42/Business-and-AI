@@ -17,7 +17,6 @@ export async function createDraftMail(
   setStatus: (s: string) => void,
 ) {
   const subject = `Angebot zu Ihrer Anfrage: ${mail.subject}`;
-
   const htmlBody = `
     <p>Sehr geehrte Damen und Herren,</p>
     <p>vielen Dank für Ihre Anfrage.</p>
@@ -37,8 +36,9 @@ export async function createDraftMail(
       },
     ],
   });
-
-  setStatus(`Angebotsmail mit aktueller PDF geöffnet (${result.review_id})`);
+  setStatus(
+    `Angebotsmail mit aktueller PDF geöffnet (${result.review_id})`,
+  );
 }
 
 export function openUrl(url: string) {
@@ -46,6 +46,5 @@ export function openUrl(url: string) {
     Office.context.ui.openBrowserWindow(url);
     return;
   }
-
   window.open(url, "_blank", "noopener,noreferrer");
 }

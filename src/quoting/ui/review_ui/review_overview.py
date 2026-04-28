@@ -1,13 +1,6 @@
-"""Review-overview blocks shown above the review tabs.
+"""Hero block + KPI strip for the review-detail page.
 
-Splits the previous ``review_overview`` module into two clear concerns:
-
-- :func:`render_review_title` — hero block with title, subtitle, and chips
-- :func:`render_workflow_steps` — visual 3-step indicator
-- :func:`render_review_overview` — KPI strip + collapsible details
-
-Visual design is owned by :mod:`layout` (CSS variables, fonts, etc.).
-This module only emits semantic HTML/components.
+Step rendering and navigation moved to :mod:`nav`.
 """
 from __future__ import annotations
 
@@ -22,19 +15,17 @@ from quoting.core import Anfrage
 
 
 def render_review_title(review_id: str | None, input_path: Path | None) -> None:
-    """Render the hero block at the top of the review page."""
+    """Render the hero block at the top of the review-detail page."""
     is_existing = bool(review_id)
 
     mode_chip = (
-        f'<span class="ek-chip ek-chip-success">'
-        f'<span style="width:6px;height:6px;border-radius:999px;'
-        f'background:currentColor;display:inline-block;"></span>'
+        '<span class="ek-chip ek-chip-success">'
+        '<span class="ek-pill-dot"></span>'
         f"Bestehender Review · <code>{review_id}</code>"
         "</span>"
         if is_existing
         else '<span class="ek-chip ek-chip-brand">'
-        '<span style="width:6px;height:6px;border-radius:999px;'
-        'background:currentColor;display:inline-block;"></span>'
+        '<span class="ek-pill-dot"></span>'
         "Neuer Upload"
         "</span>"
     )
@@ -48,14 +39,12 @@ def render_review_title(review_id: str | None, input_path: Path | None) -> None:
     st.markdown(
         f"""
         <div class="ek-title-block">
-            <div class="ek-title-row">
-                <h1 class="ek-title">
-                    Angebots-Review<span class="ek-accent-dot">.</span>
-                </h1>
-            </div>
+            <h1 class="ek-title">
+                Angebots-Review<span class="ek-accent-dot">.</span>
+            </h1>
             <p class="ek-subtitle">
-                KI-extrahierte Anfrage prüfen, Stammdaten-Treffer validieren
-                und ein verkaufsfertiges Angebot in Minuten erstellen.
+                KI-extrahierte Anfrage prüfen, Stammdaten-Treffer
+                validieren und ein verkaufsfertiges Angebot erstellen.
             </p>
             <div class="ek-meta-row">
                 {mode_chip}
@@ -65,39 +54,6 @@ def render_review_title(review_id: str | None, input_path: Path | None) -> None:
         """,
         unsafe_allow_html=True,
     )
-
-
-# --------------------------------------------------------------------- steps
-
-
-def render_workflow_steps(active: int) -> None:
-    """Render the 3-step workflow indicator.
-
-    ``active`` is 1-based: ``1`` = step 1 active, etc. Steps before the
-    active one are rendered as ``done``.
-    """
-    steps = [
-        ("01", "Anfrage prüfen", "Extrahierte Daten korrigieren"),
-        ("02", "Angebot & Matching", "Stammdaten validieren, PDF erzeugen"),
-        ("03", "Agent Chat", "Preise & Rabatte natürlichsprachlich anpassen"),
-    ]
-
-    parts = ['<div class="ek-steps">']
-    for i, (num, title, desc) in enumerate(steps, start=1):
-        cls = "ek-step"
-        if i < active:
-            cls += " done"
-        elif i == active:
-            cls += " active"
-        parts.append(
-            f'<div class="{cls}">'
-            f'<div class="ek-step-num">SCHRITT {num}</div>'
-            f'<div class="ek-step-title">{title}</div>'
-            f'<p class="ek-step-desc">{desc}</p>'
-            "</div>"
-        )
-    parts.append("</div>")
-    st.markdown("".join(parts), unsafe_allow_html=True)
 
 
 # --------------------------------------------------------------------- KPIs
@@ -118,11 +74,10 @@ def render_review_overview(
     matched = exact + fuzzy + semantic
     match_rate = matched / total_positions if total_positions else 0.0
 
-    loaded_source = st.session_state.get("loaded_extraction_source", "unbekannt")
     pdf_ready = bool(st.session_state.get("pdf_bytes"))
     quotation = st.session_state.get("quotation")
     total_eur = (
-        f"{getattr(quotation, 'gesamtsumme', 0.0):.2f} €"
+        f"{getattr(quotation, 'gesamtsumme', 0.0):,.2f} €"
         if quotation
         else "—"
     )
@@ -133,28 +88,18 @@ def render_review_overview(
     c3.metric("Angebotssumme", total_eur)
     c4.metric("PDF", "Bereit" if pdf_ready else "Offen")
 
-    with st.expander("Review-Details anzeigen", expanded=False):
+    with st.expander("Details anzeigen", expanded=False):
         col_a, col_b = st.columns(2)
         with col_a:
             st.markdown(f"**Datei**  \n`{input_path.name}`")
             st.markdown(f"**Review-ID**  \n`{review_id or '—'}`")
         with col_b:
-            st.markdown(f"**Geladene Extraktion**  \n`{loaded_source}`")
             st.markdown(
                 f"**Matching**  \n"
-                f"exact = `{exact}`, fuzzy = `{fuzzy}`, "
-                f"semantic = `{semantic}`, no_match = `{no_match}`"
+                f"exakt = `{exact}`, fuzzy = `{fuzzy}`, "
+                f"semantisch = `{semantic}`, kein Treffer = `{no_match}`"
             )
-
-        if st.session_state.get("pdf_bytes"):
-            st.download_button(
-                label="📥 Aktuelles PDF herunterladen",
-                data=st.session_state["pdf_bytes"],
-                file_name=st.session_state.get(
-                    "pdf_file_name",
-                    f"Angebot_Draft_{review_id or 'upload'}.pdf",
-                ),
-                mime="application/pdf",
-                use_container_width=True,
-                key="download_current_pdf_overview",
+            loaded_source = st.session_state.get(
+                "loaded_extraction_source", "unbekannt"
             )
+            st.markdown(f"**Geladene Extraktion**  \n`{loaded_source}`")

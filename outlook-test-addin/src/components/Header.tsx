@@ -1,19 +1,14 @@
 /**
- * Header — quiet brand presence at the top of the panel.
+ * Header — minimal brand presence.
  *
- * Single 36px ElringKlinger mark + product name. We deliberately
- * keep this small: the panel is narrow and the mail content
- * deserves the visual real estate.
+ * The Outlook ribbon already labels the add-in; the taskpane itself
+ * just needs a quiet identification. One small EK mark, no wordmark.
  */
 export function Header() {
   return (
     <header className="app-header">
-      <div className="brand-mark" aria-hidden="true">
+      <div className="brand-mark" aria-label="ElringKlinger">
         EK
-      </div>
-      <div className="brand-text">
-        <div className="brand-title">Quotation Assistant</div>
-        <div className="brand-subtitle">ElringKlinger Kunststofftechnik</div>
       </div>
     </header>
   );

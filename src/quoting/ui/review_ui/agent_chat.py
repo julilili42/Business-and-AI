@@ -32,14 +32,13 @@ def render_agent_chat(
     agent_lang = st.session_state.get("agent_lang", "de")
     messages = st.session_state.setdefault("agent_messages", [])
 
-    # Empty-state primer
     if not messages:
         intro = (
             "Try: *Discount 5% on article ABC*, *Set pos 3 to 12 EUR*, "
             "*What is the total?*"
             if agent_lang == "en"
             else "Beispiele: *5% Rabatt auf Artikel ABC*, *Setze pos 3 auf 12 EUR*, "
-            "*Wie hoch ist die Summe?*"
+                 "*Wie hoch ist die Summe?*"
         )
         st.info(intro, icon="💡")
 
@@ -53,7 +52,6 @@ def render_agent_chat(
         else "Write an edit: discount by position/article, comment, or total question"
     )
     user_msg = st.chat_input(chat_placeholder)
-
     if user_msg:
         _handle_agent_message(
             user_msg=user_msg,
@@ -87,14 +85,12 @@ def _handle_agent_message(
     agent_lang: str,
     messages: list[dict],
 ) -> None:
-    """Dispatch a chat message to the parser, apply overrides if any."""
     messages.append({"role": "user", "content": user_msg})
 
     current_quotation = st.session_state["quotation"]
     known_articles = [
         p.artikelnummer for p in anfrage.positionen if p.artikelnummer
     ]
-
     parsed_override, parse_feedback = parse_edit_instruction(
         user_msg, known_articles, lang=agent_lang
     )
@@ -104,20 +100,16 @@ def _handle_agent_message(
         st.session_state["manual_discount_overrides"] = upsert_override(
             overrides, parsed_override
         )
-
         spinner_text = (
             "Anpassung wird angewendet und PDF neu berechnet..."
             if agent_lang == "de"
             else "Applying edit and recalculating PDF..."
         )
-
         with st.spinner(spinner_text):
             try:
                 quotation, applied_items, _pdf_out = rebuild_quotation_pdf(
-                    anfrage=anfrage,
-                    matches=matches,
-                    content_hash=content_hash,
-                    agent_lang=agent_lang,
+                    anfrage=anfrage, matches=matches,
+                    content_hash=content_hash, agent_lang=agent_lang,
                 )
             except Exception as e:
                 err = (

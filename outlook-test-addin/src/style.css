@@ -1,44 +1,41 @@
 /* ---------------------------------------------------------------
  * Quotation Add-in — visual system
  *
- * Design intent: feels native to Outlook (Fluent 2 inspired),
- * with ElringKlinger red as a single, restrained brand accent.
- *
- * Layered tokens — change these to retheme the entire add-in.
+ * Design: native to Outlook (Fluent 2 inspired), with ElringKlinger
+ * red as a single restrained brand accent. The plugin renders one
+ * card at a time so the user always sees the next sensible action.
  * ------------------------------------------------------------- */
 
 :root {
-  /* Surfaces */
   --ek-bg: #fafafa;
   --ek-surface: #ffffff;
   --ek-surface-2: #f5f5f4;
   --ek-surface-sunken: #f3f4f6;
 
-  /* Borders & dividers */
   --ek-border: #e5e7eb;
   --ek-border-strong: #d1d5db;
   --ek-divider: #f1f5f9;
 
-  /* Text */
   --ek-text: #111827;
   --ek-text-secondary: #4b5563;
   --ek-text-muted: #6b7280;
   --ek-text-faint: #9ca3af;
 
-  /* Outlook blue — for primary actions inside Outlook */
   --ek-accent: #0f6cbd;
   --ek-accent-hover: #115ea3;
   --ek-accent-soft: #ebf3fa;
   --ek-accent-border: #cfe2f3;
 
-  /* ElringKlinger brand */
   --ek-brand: #e30613;
   --ek-brand-dark: #b8000b;
 
-  /* Semantic */
   --ek-success: #0f7a3e;
   --ek-success-soft: #ecfdf5;
   --ek-success-border: #a7f3d0;
+
+  --ek-info: #1d4ed8;
+  --ek-info-soft: #eff6ff;
+  --ek-info-border: #bfdbfe;
 
   --ek-warning: #b45309;
   --ek-warning-soft: #fff7ed;
@@ -48,20 +45,15 @@
   --ek-danger-soft: #fef2f2;
   --ek-danger-border: #fecaca;
 
-  /* Radii — tighter, more Fluent-like */
   --ek-radius-sm: 6px;
   --ek-radius-md: 8px;
   --ek-radius-lg: 12px;
 
-  /* Shadows — layered for depth without heaviness */
   --ek-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.04),
                  0 1px 1px rgba(15, 23, 42, 0.02);
   --ek-shadow-2: 0 4px 12px rgba(15, 23, 42, 0.06),
                  0 1px 2px rgba(15, 23, 42, 0.04);
-  --ek-shadow-3: 0 12px 32px rgba(15, 23, 42, 0.10),
-                 0 2px 4px rgba(15, 23, 42, 0.04);
 
-  /* Typography — system stack first so it feels NATIVE in Outlook */
   --ek-font-sans: "Segoe UI Variable", "Segoe UI", -apple-system,
                   BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
                   Arial, sans-serif;
@@ -69,14 +61,9 @@
                   Consolas, "Courier New", monospace;
 }
 
-/* ---------- Reset / base ---------- */
+* { box-sizing: border-box; }
 
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
+html, body {
   margin: 0;
   padding: 0;
   background: var(--ek-bg);
@@ -86,70 +73,42 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
 }
 
-button,
-input,
-textarea {
-  font-family: inherit;
-}
+button, input, textarea { font-family: inherit; }
 
 /* ---------- App shell ---------- */
 
 .panel {
   min-height: 100vh;
-  padding: 16px 14px 28px;
+  padding: 14px 14px 24px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
-/* ---------- Header ---------- */
+/* ---------- Header (minimal) ---------- */
 
 .app-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 4px 2px 10px;
-  border-bottom: 1px solid var(--ek-divider);
-  margin-bottom: 4px;
+  padding: 0 0 6px;
+  margin-bottom: 2px;
 }
 
 .brand-mark {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: var(--ek-radius-md);
   background: linear-gradient(135deg, var(--ek-brand) 0%, var(--ek-brand-dark) 100%);
   color: white;
   display: grid;
   place-items: center;
   font-weight: 700;
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  box-shadow: 0 4px 10px rgba(227, 6, 19, 0.22);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 6px rgba(227, 6, 19, 0.22);
   flex-shrink: 0;
-}
-
-.brand-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.brand-title {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--ek-text);
-  letter-spacing: -0.01em;
-}
-
-.brand-subtitle {
-  font-size: 12px;
-  color: var(--ek-text-muted);
-  font-weight: 400;
-  margin-top: 1px;
 }
 
 /* ---------- Step indicator ---------- */
@@ -158,19 +117,16 @@ textarea {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
-  padding: 2px 0 4px;
 }
 
 .step {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 10px 10px 9px;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
   background: var(--ek-surface);
   border: 1px solid var(--ek-border);
   border-radius: var(--ek-radius-md);
-  position: relative;
   transition: border-color 0.18s ease, background 0.18s ease;
 }
 
@@ -185,42 +141,33 @@ textarea {
 }
 
 .step-num {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   font-size: 11px;
   font-weight: 700;
   background: var(--ek-surface-2);
-  color: var(--ek-text-secondary);
+  color: var(--ek-text-muted);
+  flex-shrink: 0;
 }
 
-.step.active .step-num {
-  background: var(--ek-accent);
-  color: white;
-}
-
-.step.done .step-num {
-  background: var(--ek-success);
-  color: white;
-}
+.step.active .step-num { background: var(--ek-accent); color: white; }
+.step.done   .step-num { background: var(--ek-success); color: white; }
 
 .step-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ek-text-secondary);
-  letter-spacing: 0.01em;
-  line-height: 1.25;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.step.active .step-label {
-  color: var(--ek-accent-hover);
-}
-
-.step.done .step-label {
-  color: var(--ek-success);
-}
+.step.active .step-label { color: var(--ek-accent-hover); }
+.step.done   .step-label { color: var(--ek-success); }
 
 /* ---------- Card ---------- */
 
@@ -228,109 +175,123 @@ textarea {
   background: var(--ek-surface);
   border: 1px solid var(--ek-border);
   border-radius: var(--ek-radius-lg);
-  padding: 14px 14px 14px;
+  padding: 14px 14px;
   box-shadow: var(--ek-shadow-1);
 }
 
-.card + .card {
-  margin-top: 0;
+.card-info {
+  border-color: var(--ek-info-border);
+  background:
+    linear-gradient(180deg, var(--ek-info-soft) 0%, var(--ek-surface) 70%);
+  box-shadow: var(--ek-shadow-2);
 }
 
-.card-header {
+.card-success {
+  border-color: var(--ek-success-border);
+  background:
+    linear-gradient(180deg, var(--ek-success-soft) 0%, var(--ek-surface) 70%);
+  box-shadow: var(--ek-shadow-2);
+}
+
+.card-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.row-between {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
 }
 
-.card-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--ek-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.empty-state {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
+  color: var(--ek-text-muted);
+  padding: 4px 0;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-.card-title-icon {
-  width: 12px;
-  height: 12px;
-  opacity: 0.7;
-}
-
-/* Highlight card variant — used for the “next action” card */
-.card.card-highlight {
-  border-color: var(--ek-success-border);
-  background:
-    linear-gradient(180deg, var(--ek-success-soft) 0%, var(--ek-surface) 80%);
-  box-shadow: var(--ek-shadow-2);
-}
-
-/* ---------- Mail summary ---------- */
+/* ---------- Mail subject/sender ---------- */
 
 .mail-subject {
   font-size: 15px;
   font-weight: 600;
   color: var(--ek-text);
   line-height: 1.35;
-  margin-bottom: 10px;
   letter-spacing: -0.005em;
-  /* clamp at 3 lines so layout stays calm */
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.kv-list {
+.mail-sender {
+  font-size: 12.5px;
+  color: var(--ek-text-muted);
+  margin-top: -4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Meta grid (timestamps) ---------- */
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: var(--ek-surface-2);
+  border-radius: var(--ek-radius-md);
+  padding: 8px 10px;
+  border: 1px solid var(--ek-border);
+}
+
+.meta-cell {
   display: flex;
   flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
-.kv-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  border-top: 1px solid var(--ek-divider);
-  font-size: 13px;
-}
-
-.kv-row:first-child {
-  border-top: none;
-  padding-top: 2px;
-}
-
-.kv-label {
+.meta-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--ek-text-muted);
-  font-weight: 500;
-  flex-shrink: 0;
 }
 
-.kv-value {
+.meta-value {
+  font-size: 12.5px;
   color: var(--ek-text);
   font-weight: 500;
-  text-align: right;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.kv-value.muted {
+.review-id {
+  font-family: var(--ek-font-mono);
+  font-size: 11px;
   color: var(--ek-text-muted);
-  font-weight: 400;
+  background: white;
+  border: 1px solid var(--ek-border);
+  padding: 2px 7px;
+  border-radius: 999px;
 }
 
-/* ---------- Pills (status / counts) ---------- */
+/* ---------- Pills ---------- */
 
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
+  gap: 6px;
+  padding: 3px 9px 3px 7px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
@@ -346,10 +307,10 @@ textarea {
   border-color: var(--ek-success-border);
 }
 
-.pill-warning {
-  background: var(--ek-warning-soft);
-  color: var(--ek-warning);
-  border-color: var(--ek-warning-border);
+.pill-info {
+  background: var(--ek-info-soft);
+  color: var(--ek-info);
+  border-color: var(--ek-info-border);
 }
 
 .pill-neutral {
@@ -372,7 +333,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 4px;
 }
 
 .btn {
@@ -401,14 +362,8 @@ textarea {
   outline-offset: 2px;
 }
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn:active:not(:disabled) {
-  transform: translateY(1px);
-}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
 
 .btn-primary {
   background: var(--ek-accent);
@@ -416,9 +371,7 @@ textarea {
   box-shadow: 0 1px 2px rgba(15, 108, 189, 0.22);
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: var(--ek-accent-hover);
-}
+.btn-primary:hover:not(:disabled) { background: var(--ek-accent-hover); }
 
 .btn-secondary {
   background: var(--ek-surface);
@@ -444,18 +397,32 @@ textarea {
 .btn-danger-ghost {
   background: transparent;
   color: var(--ek-danger);
-  border-color: transparent;
 }
 
 .btn-danger-ghost:hover:not(:disabled) {
   background: var(--ek-danger-soft);
-  border-color: var(--ek-danger-border);
 }
 
 .btn-icon {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
+}
+
+/* ---------- Success banner ---------- */
+
+.success-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  background: white;
+  border: 1px solid var(--ek-success-border);
+  border-radius: var(--ek-radius-md);
+  color: var(--ek-success);
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 /* ---------- Status banner ---------- */
@@ -480,10 +447,7 @@ textarea {
   margin-top: 1px;
 }
 
-.status-text {
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
+.status-text { word-break: break-word; overflow-wrap: anywhere; }
 
 .status-loading {
   background: var(--ek-warning-soft);
@@ -507,13 +471,46 @@ textarea {
   color: var(--ek-danger);
 }
 
-@keyframes ek-spin {
-  to {
-    transform: rotate(360deg);
-  }
+@keyframes ek-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Advanced (single collapsible) ---------- */
+
+details.advanced {
+  border: 1px solid var(--ek-border);
+  border-radius: var(--ek-radius-md);
+  background: var(--ek-surface);
+  overflow: hidden;
 }
 
-/* ---------- Attachments ---------- */
+details.advanced > summary {
+  cursor: pointer;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ek-text-muted);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+
+details.advanced > summary::-webkit-details-marker { display: none; }
+details.advanced > summary > svg { transition: transform 0.18s ease; }
+details.advanced[open] > summary > svg { transform: rotate(-90deg); }
+
+.advanced-meta {
+  margin-left: auto;
+  color: var(--ek-text-faint);
+  font-weight: 500;
+}
+
+.advanced-body {
+  border-top: 1px solid var(--ek-divider);
+  padding: 10px 12px 12px;
+}
+
+/* attachment list inside advanced */
 
 .attachment-list {
   display: flex;
@@ -532,7 +529,7 @@ textarea {
   font-size: 13px;
 }
 
-.attachment-icon-wrap {
+.attachment-icon {
   width: 28px;
   height: 28px;
   border-radius: var(--ek-radius-sm);
@@ -547,16 +544,13 @@ textarea {
   color: var(--ek-text-secondary);
 }
 
-.attachment-icon-wrap.is-pdf {
+.attachment-icon.is-pdf {
   color: var(--ek-brand);
   border-color: #fecaca;
   background: #fef2f2;
 }
 
-.attachment-body {
-  min-width: 0;
-  flex: 1;
-}
+.attachment-body { min-width: 0; flex: 1; }
 
 .attachment-name {
   font-weight: 500;
@@ -572,59 +566,33 @@ textarea {
   margin-top: 1px;
 }
 
-.empty {
-  color: var(--ek-text-muted);
-  font-size: 13px;
-  font-style: normal;
-  padding: 4px 0;
+/* debug nested inside advanced */
+
+details.debug-inner {
+  margin-top: 12px;
+  border-top: 1px solid var(--ek-divider);
+  padding-top: 10px;
 }
 
-/* ---------- Debug panel ---------- */
-
-details.debug {
-  margin-top: 4px;
-  border: 1px solid var(--ek-border);
-  border-radius: var(--ek-radius-md);
-  background: var(--ek-surface);
-  overflow: hidden;
-}
-
-details.debug > summary {
+details.debug-inner > summary {
   cursor: pointer;
-  padding: 9px 12px;
-  font-size: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ek-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.debug-section-label {
+  margin-top: 8px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--ek-text-muted);
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  user-select: none;
-}
-
-details.debug > summary::-webkit-details-marker {
-  display: none;
-}
-
-details.debug > summary::before {
-  content: "▸";
-  font-size: 10px;
-  color: var(--ek-text-faint);
-  transition: transform 0.18s ease;
-}
-
-details.debug[open] > summary::before {
-  transform: rotate(90deg);
-}
-
-details.debug > .debug-body {
-  padding: 0 12px 12px;
-  border-top: 1px solid var(--ek-divider);
 }
 
 pre.debug-pre {
-  margin: 10px 0 0;
-  max-height: 220px;
+  margin: 6px 0 0;
+  max-height: 200px;
   overflow: auto;
   background: #0f172a;
   color: #e2e8f0;
@@ -648,34 +616,10 @@ pre.debug-pre {
   letter-spacing: 0.01em;
 }
 
-/* ---------- Pending review card ---------- */
-
-.review-id-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px 3px 6px;
-  border-radius: 999px;
-  background: white;
-  border: 1px solid var(--ek-success-border);
-  color: var(--ek-success);
-  font-size: 12px;
+.footer-link {
+  color: var(--ek-accent);
+  text-decoration: none;
   font-weight: 600;
 }
 
-.review-id-chip code {
-  font-family: var(--ek-font-mono);
-  font-size: 11px;
-  color: var(--ek-success);
-}
-
-.hint {
-  margin: 0;
-  padding: 8px 10px;
-  background: var(--ek-surface-sunken);
-  border-radius: var(--ek-radius-md);
-  font-size: 12px;
-  color: var(--ek-text-secondary);
-  line-height: 1.5;
-  margin-top: 12px;
-}
+.footer-link:hover { text-decoration: underline; }

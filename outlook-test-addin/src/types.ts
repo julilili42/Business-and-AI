@@ -19,10 +19,3 @@ export type CreateReviewResponse = {
   draft_pdf_url: string;
   draft_pdf_filename: string;
 };
-
-export type PendingReview = {
-  review: CreateReviewResponse;
-  mailSubject: string;
-  sender: string;
-  createdAt: string;
-};

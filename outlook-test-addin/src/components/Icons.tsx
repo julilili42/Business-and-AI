@@ -1,17 +1,15 @@
 /**
- * Minimal inline SVG icons.
- *
- * We don't pull a whole icon library — each icon is hand-trimmed to
- * the few we actually use. All icons inherit `currentColor` so they
- * pick up text color from their parent.
+ * Minimal inline SVG icons. All inherit `currentColor`.
  */
 import type { ReactNode, SVGProps } from "react";
 
-type IconProps = SVGProps<SVGSVGElement> & {
-  size?: number;
-};
+type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
-function Icon({ size = 16, children, ...rest }: IconProps & { children: ReactNode }) {
+function Icon({
+  size = 16,
+  children,
+  ...rest
+}: IconProps & { children: ReactNode }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -30,20 +28,6 @@ function Icon({ size = 16, children, ...rest }: IconProps & { children: ReactNod
     </svg>
   );
 }
-
-export const InboxIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <path d="M2 9h3l1 2h4l1-2h3" />
-    <path d="M2 9V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5" />
-    <path d="M2 9v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9" />
-  </Icon>
-);
-
-export const PaperclipIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <path d="M11.5 5L6.7 9.8a1.6 1.6 0 1 0 2.3 2.3L13.5 7.7a3 3 0 1 0-4.2-4.2L4.6 8.2a4.4 4.4 0 1 0 6.2 6.2l4.5-4.5" />
-  </Icon>
-);
 
 export const SparkIcon = (p: IconProps) => (
   <Icon {...p}>
@@ -87,10 +71,10 @@ export const ExternalIcon = (p: IconProps) => (
   </Icon>
 );
 
-export const FileIcon = (p: IconProps) => (
+export const SendIcon = (p: IconProps) => (
   <Icon {...p}>
-    <path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6L9 2Z" />
-    <path d="M9 2v4h4" />
+    <path d="M14 2L1.5 7.5l4.5 1.5 1.5 4.5L14 2Z" />
+    <path d="M14 2L6 10" />
   </Icon>
 );
 
@@ -102,9 +86,8 @@ export const TrashIcon = (p: IconProps) => (
   </Icon>
 );
 
-export const SendIcon = (p: IconProps) => (
+export const ChevronDown = (p: IconProps) => (
   <Icon {...p}>
-    <path d="M14 2L1.5 7.5l4.5 1.5 1.5 4.5L14 2Z" />
-    <path d="M14 2L6 10" />
+    <path d="M3.5 6.5L8 11l4.5-4.5" />
   </Icon>
 );

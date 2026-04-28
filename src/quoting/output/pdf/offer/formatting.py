@@ -46,6 +46,6 @@ def format_eur_de(value: float) -> str:
 
 def find_logo_path(config: OfferPdfConfig) -> Path | None:
     """Return logo path if available."""
-    quoting_root = Path(__file__).resolve().parents[2]
+    quoting_root = Path(__file__).resolve().parents[3]
     candidate = quoting_root / config.logo_relative_path
     return candidate if candidate.exists() else None
