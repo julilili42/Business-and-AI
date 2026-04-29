@@ -2,7 +2,6 @@
 
 Owns:
 - The global stylesheet (``apply_style``)
-- The marketing-style top header with partner logos (``render_header``)
 - Sidebar variants for dashboard / review / settings pages
 
 Design intent: stakeholder-grade polish with one ElringKlinger-red accent;
@@ -93,33 +92,6 @@ h2, h3 { font-weight: 700; }
   padding-bottom: 4rem !important;
   max-width: 1400px;
 }
-
-/* ---------------- Top header strip ---------------- */
-.ek-header {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 44px;
-  padding: 22px 8px;
-  background: var(--ek-surface);
-  border-bottom: 1px solid var(--ek-divider);
-  margin: 0 -1rem 28px -1rem;
-}
-.ek-support-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--ek-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-}
-.ek-partner-logo {
-  height: 60px;
-  width: auto;
-  object-fit: contain;
-  opacity: 0.92;
-  transition: opacity 0.2s ease;
-}
-.ek-partner-logo:hover { opacity: 1; }
 
 /* ---------------- Page title ---------------- */
 .ek-title-block {
@@ -260,7 +232,9 @@ h2, h3 { font-weight: 700; }
   background-color: var(--ek-surface) !important;
   border-right: 1px solid var(--ek-divider);
 }
-[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] { padding-top: 1rem; }
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+  padding-top: 8px !important;
+}
 
 .ek-review-id-box {
   background: linear-gradient(180deg, var(--ek-success-soft) 0%, #ffffff 100%);
@@ -814,34 +788,13 @@ def apply_style() -> None:
     st.markdown(_GLOBAL_CSS, unsafe_allow_html=True)
 
 
-# --------------------------------------------------------------------- header
-def render_header() -> None:
-    """Marketing-style top header with partner logos."""
-    logos = [
-        ("logo_bw_stiftung.png", "Stiftung Baden-Württemberg"),
-        ("logo_bw_wappen.png",   "Wappen Baden-Württemberg"),
-        ("logo_bw_bank.png",     "BW-Bank"),
-    ]
-    parts = ['<div class="ek-header">',
-             '<span class="ek-support-label">Unterstützt durch</span>']
-    for filename, alt in logos:
-        encoded = img_to_base64(ASSETS_DIR / filename)
-        if encoded:
-            parts.append(
-                f'<img src="data:image/png;base64,{encoded}" '
-                f'class="ek-partner-logo" alt="{alt}">'
-            )
-    parts.append("</div>")
-    st.markdown("".join(parts), unsafe_allow_html=True)
-
-
 # --------------------------------------------------------------------- sidebars
 def _sidebar_logo() -> None:
     elring_logo = img_to_base64(ASSETS_DIR / "logo_elringklinger.png")
     if elring_logo:
         st.markdown(
             f'<img src="data:image/png;base64,{elring_logo}" '
-            f'style="width: 100%; margin: 6px 0 22px 0;" '
+            f'style="display: block; width: 100%; margin: 0 0 22px 0;" '
             f'alt="ElringKlinger">',
             unsafe_allow_html=True,
         )

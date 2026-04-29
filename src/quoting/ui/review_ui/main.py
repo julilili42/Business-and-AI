@@ -63,7 +63,6 @@ def run() -> None:
     from quoting.ui.review_ui.dashboard import render_dashboard
     from quoting.ui.review_ui.layout import (
         apply_style,
-        render_header,
         render_sidebar_dashboard,
         render_sidebar_settings,
     )
@@ -77,7 +76,6 @@ def run() -> None:
     from quoting.ui.review_ui.upload import handle_upload
 
     apply_style()
-    render_header()
 
     # ------- Settings page ----------------------------------------------
     if _is_settings_view():
