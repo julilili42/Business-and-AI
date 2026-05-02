@@ -30,6 +30,9 @@ from .store import (
 )
 from .lifecycle import reset_review_artifacts
 from .urls import api_base_url, pdf_url
+from .summary import ReviewSummary, scan_reviews
+from .quotation_store import load_saved_quotation, quotation_from_dict
+
 
 __all__ = [
     "draft_pdf_filename",
@@ -45,4 +48,8 @@ __all__ = [
     "reset_review_artifacts",
     "api_base_url",
     "pdf_url",
+    "ReviewSummary",
+    "scan_reviews",
+    "load_saved_quotation",
+    "quotation_from_dict",
 ]

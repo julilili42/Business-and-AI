@@ -41,6 +41,8 @@ from quoting.reviews import (
     saved_attachment_paths,
 )
 
+from quoting.api.frontend_router import router as frontend_router
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 REVIEW_DIR = PROJECT_ROOT / "data" / "reviews"
@@ -56,7 +58,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+app.include_router(frontend_router)
 _pipeline = QuotingPipeline()
 
 

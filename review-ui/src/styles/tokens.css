@@ -1,0 +1,40 @@
+/*
+ * Design tokens. Mirror the palette from the Streamlit UI so the look
+ * stays consistent during the migration. Tailwind reads these via
+ * `tailwind.config.ts`.
+ *
+ * Values are in HSL so Tailwind's color utilities (`bg-brand/50`,
+ * `text-foreground/80` etc.) work out of the box.
+ */
+:root {
+  --background: 60 9% 98%;
+  --foreground: 222 47% 11%;
+
+  --surface: 0 0% 100%;
+  --surface-sunk: 60 5% 96%;
+
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 355 95% 46%;
+
+  --brand: 355 95% 46%;        /* #e30613 */
+  --brand-dark: 354 100% 36%;  /* #b8000b */
+  --brand-soft: 0 86% 97%;     /* #fef2f2 */
+
+  --success: 161 94% 24%;
+  --success-soft: 152 81% 96%;
+
+  --warning: 30 84% 36%;
+  --warning-soft: 33 100% 96%;
+
+  --info: 226 71% 40%;
+  --info-soft: 214 100% 97%;
+
+  --danger: 0 73% 41%;
+  --danger-soft: 0 86% 97%;
+
+  --radius: 0.75rem;
+}

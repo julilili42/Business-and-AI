@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n api,review,outlook -c blue,green,magenta \"uv run python run_review_api.py\" \"npm --prefix review-ui run dev -- --port 5174\" \"npm --prefix outlook-ui run dev -- --port 5173\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

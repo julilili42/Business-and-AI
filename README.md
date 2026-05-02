@@ -1,78 +1,133 @@
-# ElringKlinger Quoting Pipeline
+# ElringKlinger Quoting Pipeline – Installation & Start
 
-KI-gestützter Generator für Angebotsentwürfe.
-RFQ rein (PDF, Mail, Excel) → Angebotsentwurf raus (PDF + JSON).
+KI-gestützter Generator für Angebotsentwürfe: RFQ rein, Angebotsentwurf raus.
 
-```
+```text
 ingestion → extraction → matching → pricing → output
             (LLM)        (fuzzy)    (rules)
 ```
 
-Nur die Extraktion nutzt ein LLM. Matching und Pricing sind deterministisch
-und voll auditierbar.
+Nur die Extraktion nutzt ein LLM. Matching und Pricing sind deterministisch und auditierbar.
 
-## Setup
+## Voraussetzungen
+
+- Python 3.10+
+- Node.js 20+
+- API-Key für Gemini oder Azure OpenAI
+- Optional für Outlook-Test: `cloudflared`
+
+## 1. Repository vorbereiten
 
 ```bash
+git clone <repo-url>
+cd Business-and-AI
+```
+
+## 2. Python-Backend installieren
+
+```bash
+python -m venv .venv
+source .venv/bin/activate   # macOS/Linux
+# .venv\Scripts\activate   # Windows
+
 pip install -e ".[dev]"
-cp .env.example .env   # API-Key eintragen (Gemini oder Azure)
+cp env.example .env
 ```
 
-Für das Outlook Add-in zusätzlich Node.js ≥ 20 und
-[`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/).
+Danach in `.env` den passenden API-Key eintragen.
 
-## Drei Wege zu starten
+## 3. Frontends installieren
 
-**CLI** — schnellster Sanity-Check.
+Einmalig im Projektordner:
+
 ```bash
-python -m quoting.cli run path/to/rfq.pdf
-python -m quoting.cli batch ./inbox --output ./results
+npm install
 ```
 
-**Streamlit Review-UI** — Datei hochladen, prüfen, freigeben.
+Falls die Frontend-Pakete eigene Abhängigkeiten haben:
+
 ```bash
-python run_ui.py
+npm --prefix review-ui install
+npm --prefix outlook-ui install
 ```
-Öffnet auf `http://localhost:8501`. In Schritt 3 gibt es einen
-`⛶ Vollbild`-Button für den fokussierten Vergleich Original ↔ Entwurf.
 
-**Outlook Add-in** — End-to-End aus dem Postfach. Drei Terminals:
+## 4. Anwendung starten
+
+Terminal 1: Python-API starten.
+
 ```bash
-python run_review_api.py            # FastAPI + cloudflared-Tunnel
-python run_ui.py                    # Streamlit UI
-cd outlook-test-addin && npm run dev # Vite Dev Server (HTTPS:5173)
-```
-Add-in einmalig in Outlook laden via `outlook-test-addin/manifest.xml`.
-Mail öffnen → Ribbon-Button **TEST** → "Draft Quotation erstellen".
-
-`run_review_api.py` schreibt die aktive Tunnel-URL nach `.tunnel_url`,
-die FastAPI liest sie pro Request — kein manuelles Editieren nötig.
-
-## Layout
-
-```
-src/quoting/
-├── cli.py                # CLI entry point
-├── api/                  # FastAPI für Outlook Add-in
-├── core/                 # config, logging, schema
-├── ingestion/            # .eml / .msg / loose file parsing
-├── extraction/           # LLM extraction (Gemini / Azure)
-├── matching/             # deterministisches Matching
-├── pricing/              # deterministisches Pricing
-├── output/               # PDF + JSON writer
-├── pipeline/             # Orchestrator + Steps
-└── ui/                   # Streamlit Review-App
-
-data/
-├── stammdaten_test.csv   # Beispiel-Stammdaten
-└── reviews/              # Pro-Review-Artefakte
+python run_review_api.py
 ```
 
-ADRs in `docs/decisions/`. Architektur-Notizen in `docs/architecture.md`.
+Terminal 2: Frontends aus dem Projektordner starten.
+
+```bash
+npm run dev
+```
+
+Damit reicht für die Frontends ein einziger Startbefehl im Projektordner, sofern das Root-`package.json` entsprechend eingerichtet ist.
+
+## 5. Root-`package.json` prüfen
+
+Falls `npm run dev` im Projektordner noch nicht beide Frontends startet, im Root-`package.json` ergänzen:
+
+```json
+{
+  "scripts": {
+    "dev": "concurrently \"npm --prefix review-ui run dev\" \"npm --prefix outlook-ui run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
+```
+
+Danach einmal:
+
+```bash
+npm install
+```
+
+und anschließend:
+
+```bash
+npm run dev
+```
+
+## 6. URLs
+
+Typisch lokal:
+
+- Review UI: `http://localhost:5174` oder der Port aus der Vite-Ausgabe
+- Outlook UI: `https://localhost:5173` oder der Port aus der Vite-Ausgabe
+- FastAPI: `http://127.0.0.1:8000`
+- API Healthcheck: `http://127.0.0.1:8000/health`
+
+Die tatsächlich genutzten Ports stehen immer in der Terminalausgabe.
+
+## 7. Outlook Add-in testen
+
+1. API starten:
+
+```bash
+python run_review_api.py
+```
+
+2. Frontends starten:
+
+```bash
+npm run dev
+```
+
+3. Outlook Add-in über `outlook-ui/manifest.xml` sideloaden.
+
+4. Mail öffnen und den Add-in-Button ausführen.
+
+`run_review_api.py` schreibt die aktive Tunnel-URL nach `.tunnel_url`, damit die API-Links für das Add-in automatisch stimmen.
 
 ## Tests
 
 ```bash
-pytest                  # alle
-pytest tests/unit       # nur Unit
+pytest
+pytest tests/unit
 ```
