@@ -6,6 +6,7 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { useReviewUiStore } from "@/features/review/stores/reviewUiStore";
 import type { Anfrage } from "@/shared/schemas/anfrage";
+import { Button } from "@/shared/components/ui/button";
 
 import { useSaveAndRegenerate } from "../../hooks/useReviewMutations";
 import { customerFormSchema, type CustomerFormValues } from "./schemas";
@@ -55,6 +56,25 @@ export function CustomerForm({ reviewId, anfrage }: CustomerFormProps) {
     }
     saveAndRegenerate.mutate({ anfrage: next });
   };
+
+  const fillToday = () => {
+  const today = new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date());
+
+  form.setValue("datum", today, { shouldDirty: true });
+  trackChange("datum");
+
+  const next: Anfrage = {
+    ...anfrage,
+    ...form.getValues(),
+    datum: today,
+  };
+
+  saveAndRegenerate.mutate({ anfrage: next });
+};
 
   return (
     <section className="space-y-6">
@@ -109,11 +129,21 @@ export function CustomerForm({ reviewId, anfrage }: CustomerFormProps) {
             />
           </Field>
           <Field label="Datum">
-            <Input
-              {...form.register("datum")}
-              onBlur={() => commitField("datum")}
-              placeholder="z. B. 15.03.2024"
-            />
+            <div className="flex gap-2">
+              <Input
+                {...form.register("datum")}
+                onBlur={() => commitField("datum")}
+                placeholder="z. B. 15.03.2024"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={fillToday}
+                disabled={saveAndRegenerate.isPending}
+              >
+                Heute
+              </Button>
+            </div>
           </Field>
         </div>
       </div>
