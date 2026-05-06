@@ -154,6 +154,7 @@ class QuotingPipeline:
             quotation=quotation,
             pdf_path=pdf_path,
             duration_s=duration,
+            token_usage=ctx.extra.get("token_usage"),
         )
 
     # ---------- individual steps ----------------------------------------

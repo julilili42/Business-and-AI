@@ -1,13 +1,17 @@
 """Result of a full end-to-end pipeline run."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..core import Anfrage
 from ..ingestion import Mail
 from ..matching import MatchResult
 from ..pricing import Quotation
+
+if TYPE_CHECKING:
+    from ..extraction.llm.base import TokenUsage
 
 
 @dataclass
@@ -19,9 +23,10 @@ class PipelineResult:
     quotation: Quotation
     pdf_path: Path
     duration_s: float
+    token_usage: TokenUsage | None = field(default=None)
 
     def summary(self) -> dict:
-        return {
+        result: dict = {
             "subject": self.mail.subject,
             "sender": self.mail.sender,
             "attachments": [a.name for a in self.mail.attachments],
@@ -34,3 +39,10 @@ class PipelineResult:
             "duration_s": round(self.duration_s, 2),
             "pdf": str(self.pdf_path),
         }
+        if self.token_usage is not None:
+            result["token_usage"] = {
+                "input_tokens": self.token_usage.input_tokens,
+                "output_tokens": self.token_usage.output_tokens,
+                "total_tokens": self.token_usage.total_tokens,
+            }
+        return result

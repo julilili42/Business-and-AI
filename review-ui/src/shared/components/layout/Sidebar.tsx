@@ -1,10 +1,11 @@
-import { Database, LayoutDashboard, Settings as SettingsIcon } from "lucide-react";
+import { Activity, Database, LayoutDashboard, Settings as SettingsIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/shared/lib/cn";
 
 const NAV = [
   { to: "/", label: "Übersicht", icon: LayoutDashboard, end: true },
   { to: "/stammdaten", label: "Stammdaten", icon: Database, end: false },
+  { to: "/status", label: "Status", icon: Activity, end: false },
   { to: "/settings", label: "Einstellungen", icon: SettingsIcon, end: false },
 ] as const;
 

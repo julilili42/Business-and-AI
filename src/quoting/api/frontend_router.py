@@ -25,7 +25,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from quoting.api.approval_store import load_approval, transition
-from quoting.api.progress_store import init_progress
+from quoting.api.progress_store import init_progress, read_progress
 from quoting.api.settings_store import load_user_settings
 from quoting.core import Anfrage
 from quoting.ingestion import Mail, detect_file_type, mail_from_file, parse_mail
@@ -72,6 +72,87 @@ def _review_dir(review_id: str) -> Path:
 # ============================================================================
 # Reviews: list & detail
 # ============================================================================
+
+@router.get("/metrics")
+def get_metrics() -> dict:
+    per_review = []
+    agg: dict = dict(
+        total_reviews=0, completed_reviews=0, total_positions=0,
+        total_eur=0.0, sum_duration_s=0.0, sum_match_rate=0.0,
+        reviews_with_duration=0, reviews_with_match=0,
+        total_input_tokens=0, total_output_tokens=0, total_tokens=0,
+        reviews_with_token_data=0,
+    )
+
+    if not REVIEW_DIR.exists():
+        agg.update(avg_duration_s=0.0, avg_match_rate=0.0)
+        return {**agg, "per_review": []}
+
+    for folder in sorted(REVIEW_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if not folder.is_dir():
+            continue
+        progress = read_progress(folder)
+        if progress is None:
+            continue
+
+        agg["total_reviews"] += 1
+        if progress.get("status") == "completed":
+            agg["completed_reviews"] += 1
+
+        summary = (progress.get("result") or {}).get("summary") or {}
+        positions = int(summary.get("positions") or 0)
+        total_eur = float(summary.get("total_eur") or 0.0)
+        duration_s = float(summary.get("duration_s") or 0.0)
+
+        matched = (
+            int(summary.get("exact") or 0)
+            + int(summary.get("fuzzy") or 0)
+            + int(summary.get("semantic") or 0)
+        )
+        match_rate = matched / positions if positions > 0 else 0.0
+
+        agg["total_positions"] += positions
+        agg["total_eur"] += total_eur
+        if duration_s:
+            agg["sum_duration_s"] += duration_s
+            agg["reviews_with_duration"] += 1
+        if positions:
+            agg["sum_match_rate"] += match_rate
+            agg["reviews_with_match"] += 1
+
+        token_data = summary.get("token_usage")
+        token_row = None
+        if isinstance(token_data, dict):
+            agg["total_input_tokens"] += int(token_data.get("input_tokens") or 0)
+            agg["total_output_tokens"] += int(token_data.get("output_tokens") or 0)
+            agg["total_tokens"] += int(token_data.get("total_tokens") or 0)
+            agg["reviews_with_token_data"] += 1
+            token_row = token_data
+
+        per_review.append({
+            "review_id": folder.name,
+            "subject": str(summary.get("subject") or ""),
+            "status": progress.get("status"),
+            "updated_at": str(progress.get("updated_at") or ""),
+            "positions": positions,
+            "match_rate": round(match_rate, 3),
+            "total_eur": total_eur,
+            "duration_s": duration_s,
+            "token_usage": token_row,
+        })
+
+    rd = agg.pop("reviews_with_duration") or 1
+    rm = agg.pop("reviews_with_match") or 1
+    sd = agg.pop("sum_duration_s")
+    sm = agg.pop("sum_match_rate")
+
+    return {
+        **agg,
+        "avg_duration_s": round(sd / rd, 2),
+        "avg_match_rate": round(sm / rm, 3),
+        "per_review": per_review,
+    }
+
 
 @router.get("/reviews")
 def list_reviews() -> list[dict]:

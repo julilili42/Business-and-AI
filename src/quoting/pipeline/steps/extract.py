@@ -35,11 +35,13 @@ class ExtractionStep:
         )
 
         try:
-            anfrage = extract_anfrage(
+            anfrage, token_usage = extract_anfrage(
                 attachments=mail.attachments,
                 mail_body=mail.body,
                 settings=self.settings,
             )
+            if token_usage is not None:
+                ctx.extra["token_usage"] = token_usage
         except Exception as exc:
             ctx.report(self.name, "failed", str(exc))
             raise

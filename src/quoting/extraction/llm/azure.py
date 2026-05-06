@@ -5,7 +5,7 @@ import base64
 from typing import Any
 
 from ...core import Settings
-from .base import LLMClient
+from .base import LLMClient, LLMResponse, TokenUsage
 
 
 class AzureClient(LLMClient):
@@ -27,7 +27,7 @@ class AzureClient(LLMClient):
         self,
         prompt: str,
         images: list[dict[str, Any]] | None = None,
-    ) -> str:
+    ) -> LLMResponse:
         parts: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
         if images:
             for img in images:
@@ -44,4 +44,14 @@ class AzureClient(LLMClient):
             messages=[{"role": "user", "content": parts}],
             response_format={"type": "json_object"},
         )
-        return resp.choices[0].message.content or ""
+
+        usage = None
+        u = getattr(resp, "usage", None)
+        if u is not None:
+            usage = TokenUsage(
+                input_tokens=getattr(u, "prompt_tokens", 0) or 0,
+                output_tokens=getattr(u, "completion_tokens", 0) or 0,
+                total_tokens=getattr(u, "total_tokens", 0) or 0,
+            )
+
+        return LLMResponse(text=resp.choices[0].message.content or "", usage=usage)

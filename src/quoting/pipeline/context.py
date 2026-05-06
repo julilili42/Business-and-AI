@@ -21,6 +21,7 @@ class StepContext:
 
     work_dir: Path
     progress: ProgressCallback = field(default=noop_progress)
+    extra: dict = field(default_factory=dict)
 
     def persist(self, filename: str, data: Any) -> Path:
         """Write a JSON snapshot of intermediate state to the work dir."""

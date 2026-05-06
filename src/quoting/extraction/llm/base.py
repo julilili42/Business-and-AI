@@ -2,11 +2,25 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 from ...core import get_logger
 
 log = get_logger()
+
+
+@dataclass
+class TokenUsage:
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+
+
+@dataclass
+class LLMResponse:
+    text: str
+    usage: TokenUsage | None
 
 
 class LLMClient(Protocol):
@@ -16,7 +30,7 @@ class LLMClient(Protocol):
         self,
         prompt: str,
         images: list[dict[str, Any]] | None = None,
-    ) -> str: ...
+    ) -> LLMResponse: ...
 
 
 def with_retry(

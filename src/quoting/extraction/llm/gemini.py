@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from ...core import Settings
-from .base import LLMClient
+from .base import LLMClient, LLMResponse, TokenUsage
 
 
 class GeminiClient(LLMClient):
@@ -21,7 +21,7 @@ class GeminiClient(LLMClient):
         self,
         prompt: str,
         images: list[dict[str, Any]] | None = None,
-    ) -> str:
+    ) -> LLMResponse:
         from google.genai import types
 
         contents: list[Any] = [prompt]
@@ -36,4 +36,14 @@ class GeminiClient(LLMClient):
             model=self._model,
             contents=contents,
         )
-        return response.text or ""
+
+        usage = None
+        meta = getattr(response, "usage_metadata", None)
+        if meta is not None:
+            usage = TokenUsage(
+                input_tokens=getattr(meta, "prompt_token_count", 0) or 0,
+                output_tokens=getattr(meta, "candidates_token_count", 0) or 0,
+                total_tokens=getattr(meta, "total_token_count", 0) or 0,
+            )
+
+        return LLMResponse(text=response.text or "", usage=usage)
