@@ -10,6 +10,7 @@ import { cn } from "@/shared/lib/cn";
 import type { Evidence, Position } from "@/shared/schemas/anfrage";
 import type { MatchResult } from "@/shared/schemas/matchResult";
 import type { ManualOverride, QuotationItem } from "@/shared/schemas/quotation";
+import type { StammdatenRow } from "@/shared/schemas/stammdaten";
 
 import { MatchChip } from "./MatchChip";
 import { StammdatenSearchDialog } from "./StammdatenSearchDialog";
@@ -81,6 +82,20 @@ export function PositionCard({
     }
   };
 
+  const handleAssign = (row: StammdatenRow) => {
+    const updated: Position = {
+      ...draft,
+      artikelnummer: row.artikel_nr,
+      bezeichnung: row.bezeichnung || draft.bezeichnung,
+      werkstoff: row.werkstoff ?? draft.werkstoff,
+      abmessungen: row.abmessungen ?? draft.abmessungen,
+      einheit: row.einheit || draft.einheit,
+    };
+    setDraft(updated);
+    onPositionChange(updated);
+    onFieldEdit(`positionen[${index}].artikelnummer`);
+  };
+
   const initialUnitPrice =
     unitPriceOverride ?? quotationItem?.einzelpreis ?? 0;
   const [unitPriceDraft, setUnitPriceDraft] = useState<number>(initialUnitPrice);
@@ -106,21 +121,54 @@ export function PositionCard({
   return (
     <Accordion.Item
       value={`pos-${position.pos_nr}`}
-      className="rounded-lg border border-border bg-surface shadow-card transition-colors hover:border-foreground/20"
+      className={cn(
+        "rounded-lg border bg-surface shadow-card transition-colors",
+        confirmingDelete ? "border-danger/40" : "border-border hover:border-foreground/20",
+      )}
     >
-      <Accordion.Header>
+      <Accordion.Header className="flex items-stretch">
         <Accordion.Trigger
           className={cn(
-            "group flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold",
+            "group flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left text-sm font-semibold",
             "data-[state=open]:border-b data-[state=open]:border-border",
           )}
         >
           <span className="truncate">{label}</span>
           <ChevronDown
-            className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
+            className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
             aria-hidden="true"
           />
         </Accordion.Trigger>
+
+        {/* Delete — always visible, separate click target */}
+        {confirmingDelete ? (
+          <div className="flex items-center gap-1.5 border-b border-danger/30 border-l border-l-danger/20 bg-danger-soft px-3">
+            <span className="text-[11px] font-semibold text-danger whitespace-nowrap">Löschen?</span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setConfirmingDelete(false); onDelete(); }}
+              className="rounded px-1.5 py-0.5 text-[11px] font-bold text-danger bg-danger/10 hover:bg-danger/20"
+            >
+              Ja
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setConfirmingDelete(false); }}
+              className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Nein
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            aria-label={`Position ${position.pos_nr} löschen`}
+            onClick={(e) => { e.stopPropagation(); setConfirmingDelete(true); }}
+            className="flex items-center border-l border-border px-3 text-muted-foreground/40 transition-colors hover:bg-danger-soft hover:text-danger data-[state=open]:border-b data-[state=open]:border-border"
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        )}
       </Accordion.Header>
 
       <Accordion.Content
@@ -133,6 +181,7 @@ export function PositionCard({
             reviewId={reviewId}
             posNr={position.pos_nr}
             initialQuery={position.artikelnummer || position.bezeichnung}
+            onAssign={handleAssign}
           >
             <Button type="button" size="sm" variant="ghost" className="border border-border">
               <Replace className="h-3.5 w-3.5" aria-hidden="true" />
@@ -281,46 +330,6 @@ export function PositionCard({
           </div>
         )}
 
-        {/* ---- Destructive actions ---- */}
-        <div className="mt-4 flex justify-end border-t border-border pt-3">
-          {confirmingDelete ? (
-            <div className="flex items-center gap-2 rounded-md border border-danger/30 bg-danger-soft px-3 py-2">
-              <span className="text-xs font-semibold text-danger">
-                Position {position.pos_nr} wirklich löschen?
-              </span>
-              <Button
-                type="button"
-                size="sm"
-                variant="danger"
-                onClick={() => {
-                  setConfirmingDelete(false);
-                  onDelete();
-                }}
-              >
-                Bestätigen
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirmingDelete(false)}
-              >
-                Abbrechen
-              </Button>
-            </div>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="text-danger hover:bg-danger-soft hover:text-danger"
-              onClick={() => setConfirmingDelete(true)}
-            >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-              Position löschen
-            </Button>
-          )}
-        </div>
       </Accordion.Content>
     </Accordion.Item>
   );

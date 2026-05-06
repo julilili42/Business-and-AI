@@ -18,6 +18,33 @@ function fmtPct(n: number): string {
   return (n * 100).toFixed(1) + " %";
 }
 
+const MINUTES_PER_MANUAL_REVIEW = 15;
+
+function OperativeWirkung({ m }: { m: Metrics }) {
+  const avgPositions = m.total_reviews > 0 ? m.total_positions / m.total_reviews : 0;
+  const hoursSaved = (m.total_reviews * MINUTES_PER_MANUAL_REVIEW) / 60;
+
+  return (
+    <section className="mb-8">
+      <h2 className="section-label mb-3">Operative Wirkung</h2>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <MetricTile label="Reviews" value={m.total_reviews} hint="Gesamtanzahl Anfragen" />
+        <MetricTile label="Ø Positionen" value={avgPositions.toFixed(1)} hint="pro Anfrage" />
+        <MetricTile
+          label="Ø Match-Quote"
+          value={`${Math.round(m.avg_match_rate * 100)} %`}
+          hint="Stammdaten-Treffer"
+        />
+        <MetricTile
+          label="Zeitersparnis"
+          value={`${hoursSaved.toFixed(1)} h`}
+          hint={`~${MINUTES_PER_MANUAL_REVIEW} min/Anfrage manuell`}
+        />
+      </div>
+    </section>
+  );
+}
+
 function AggregateMetrics({ m }: { m: Metrics }) {
   return (
     <section className="mb-8">
@@ -163,6 +190,7 @@ export function StatusPage() {
         </p>
       </header>
 
+      <OperativeWirkung m={data} />
       <AggregateMetrics m={data} />
       <TokenMetrics m={data} />
       <PerReviewTable rows={data.per_review} />

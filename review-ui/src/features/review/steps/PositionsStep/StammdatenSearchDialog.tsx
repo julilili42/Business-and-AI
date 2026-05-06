@@ -25,13 +25,9 @@ import {
 interface StammdatenSearchDialogProps {
   reviewId: string;
   posNr: number;
-  /**
-   * Pre-fill the search box with the position's article number when
-   * opened — gives the user a starting point if the auto-match got
-   * close but not exact.
-   */
   initialQuery?: string;
-  /** Trigger element. Required because the dialog has no default look. */
+  /** Called after a successful assignment so the position card can update its fields. */
+  onAssign?: (row: StammdatenRow) => void;
   children: React.ReactNode;
 }
 
@@ -48,6 +44,7 @@ export function StammdatenSearchDialog({
   reviewId,
   posNr,
   initialQuery,
+  onAssign,
   children,
 }: StammdatenSearchDialogProps) {
   const [open, setOpen] = useState(false);
@@ -108,7 +105,12 @@ export function StammdatenSearchDialog({
                   onPin={() =>
                     override.mutate(
                       { posNr, artikelNr: row.artikel_nr },
-                      { onSuccess: () => setOpen(false) },
+                      {
+                        onSuccess: () => {
+                          onAssign?.(row);
+                          setOpen(false);
+                        },
+                      },
                     )
                   }
                 />

@@ -10,7 +10,6 @@ import { UploadDropzone } from "@/features/upload/UploadDropzone";
 import { DashboardHero } from "./components/DashboardHero";
 import { ReviewFilters, type StatusFilter } from "./components/ReviewFilters";
 import { ReviewList } from "./components/ReviewList";
-import { ValueMetrics } from "./components/ValueMetrics";
 import { useReviewSummaries } from "./hooks/useReviewSummaries";
 
 export function DashboardPage() {
@@ -53,8 +52,6 @@ export function DashboardPage() {
 
       {!isLoading && !isError && reviews && reviews.length > 0 && (
         <div className="space-y-8">
-          <ValueMetrics reviews={reviews} />
-
           <section>
             <div className="section-label mb-3">Reviews</div>
             <div className="mb-4">
