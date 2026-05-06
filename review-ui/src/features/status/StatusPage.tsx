@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { ErrorState } from "@/shared/components/feedback/ErrorState";
 import { LoadingState } from "@/shared/components/feedback/LoadingState";
 import { PageContainer } from "@/shared/components/layout/PageContainer";
-import { MetricTile } from "@/features/dashboard/components/MetricTile";
 import { useMetrics } from "./hooks/useMetrics";
 import type { Metrics, PerReviewMetric } from "./schemas/metrics";
 
@@ -20,91 +19,81 @@ function fmtPct(n: number): string {
 
 const MINUTES_PER_MANUAL_REVIEW = 15;
 
-function OperativeWirkung({ m }: { m: Metrics }) {
+function StatCell({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+  return (
+    <div className="bg-surface px-5 py-5">
+      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+      <p className="mt-1.5 font-display text-xl font-semibold tracking-tight text-foreground">{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground/60">{hint}</p>}
+    </div>
+  );
+}
+
+function PipelineStats({ m }: { m: Metrics }) {
   const avgPositions = m.total_reviews > 0 ? m.total_positions / m.total_reviews : 0;
+  const completedPct = m.total_reviews > 0 ? Math.round((m.completed_reviews / m.total_reviews) * 100) : 0;
   const hoursSaved = (m.total_reviews * MINUTES_PER_MANUAL_REVIEW) / 60;
 
   return (
-    <section className="mb-8">
-      <h2 className="section-label mb-3">Operative Wirkung</h2>
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <MetricTile label="Reviews" value={m.total_reviews} hint="Gesamtanzahl Anfragen" />
-        <MetricTile label="Ø Positionen" value={avgPositions.toFixed(1)} hint="pro Anfrage" />
-        <MetricTile
-          label="Ø Match-Quote"
-          value={`${Math.round(m.avg_match_rate * 100)} %`}
-          hint="Stammdaten-Treffer"
-        />
-        <MetricTile
-          label="Zeitersparnis"
-          value={`${hoursSaved.toFixed(1)} h`}
-          hint={`~${MINUTES_PER_MANUAL_REVIEW} min/Anfrage manuell`}
-        />
-      </div>
-    </section>
+    <div className="mb-8 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3 lg:grid-cols-6">
+      <StatCell
+        label="Angebote"
+        value={m.total_reviews}
+        hint={`${m.completed_reviews} abgeschlossen (${completedPct} %)`}
+      />
+      <StatCell
+        label="Positionen"
+        value={fmt(m.total_positions)}
+        hint={`Ø ${avgPositions.toFixed(1)} pro Angebot`}
+      />
+      <StatCell
+        label="Match-Quote"
+        value={fmtPct(m.avg_match_rate)}
+        hint="Stammdaten-Treffer"
+      />
+      <StatCell
+        label="Gesamtvolumen"
+        value={fmtEur(m.total_eur)}
+      />
+      <StatCell
+        label="Ø Dauer"
+        value={`${m.avg_duration_s} s`}
+        hint="pro Angebot"
+      />
+      <StatCell
+        label="Zeitersparnis"
+        value={`${hoursSaved.toFixed(1)} h`}
+        hint={`~${MINUTES_PER_MANUAL_REVIEW} min / Anfrage`}
+      />
+    </div>
   );
 }
 
-function AggregateMetrics({ m }: { m: Metrics }) {
-  return (
-    <section className="mb-8">
-      <h2 className="section-label mb-4">Pipeline-Übersicht</h2>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <MetricTile label="Angebote gesamt" value={m.total_reviews} />
-        <MetricTile
-          label="Abgeschlossen"
-          value={m.completed_reviews}
-          hint={`${m.total_reviews > 0 ? Math.round((m.completed_reviews / m.total_reviews) * 100) : 0} %`}
-        />
-        <MetricTile
-          label="Ø Verarbeitungszeit"
-          value={`${m.avg_duration_s} s`}
-        />
-        <MetricTile
-          label="Ø Match-Rate"
-          value={fmtPct(m.avg_match_rate)}
-        />
-        <MetricTile
-          label="Gesamtvolumen"
-          value={fmtEur(m.total_eur)}
-          hint={`${m.total_positions} Positionen`}
-        />
-      </div>
-    </section>
-  );
-}
-
-function TokenMetrics({ m }: { m: Metrics }) {
+function TokenSummary({ m }: { m: Metrics }) {
   if (m.reviews_with_token_data === 0) return null;
 
   const avgInput = Math.round(m.total_input_tokens / m.reviews_with_token_data);
   const avgOutput = Math.round(m.total_output_tokens / m.reviews_with_token_data);
 
   return (
-    <section className="mb-8">
-      <h2 className="section-label mb-4">Token-Verbrauch</h2>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        <MetricTile
-          label="Eingabe-Tokens gesamt"
-          value={fmt(m.total_input_tokens)}
-          hint={`Ø ${fmt(avgInput)} / Angebot`}
-        />
-        <MetricTile
-          label="Ausgabe-Tokens gesamt"
-          value={fmt(m.total_output_tokens)}
-          hint={`Ø ${fmt(avgOutput)} / Angebot`}
-        />
-        <MetricTile
-          label="Token gesamt"
-          value={fmt(m.total_tokens)}
-        />
-        <MetricTile
-          label="Angebote mit Token-Daten"
-          value={m.reviews_with_token_data}
-          hint={`von ${m.total_reviews} gesamt`}
-        />
-      </div>
-    </section>
+    <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-lg border border-border bg-surface px-5 py-3.5 text-sm">
+      <span className="font-medium text-foreground">Token</span>
+      <span className="text-muted-foreground">
+        Eingabe Ø{" "}
+        <span className="font-semibold tabular-nums text-foreground">{fmt(avgInput)}</span>
+      </span>
+      <span className="text-muted-foreground">
+        Ausgabe Ø{" "}
+        <span className="font-semibold tabular-nums text-foreground">{fmt(avgOutput)}</span>
+      </span>
+      <span className="text-muted-foreground">
+        Gesamt{" "}
+        <span className="font-semibold tabular-nums text-foreground">{fmt(m.total_tokens)}</span>
+      </span>
+      <span className="ml-auto text-muted-foreground/70">
+        {m.reviews_with_token_data} von {m.total_reviews} Angeboten mit Daten
+      </span>
+    </div>
   );
 }
 
@@ -113,11 +102,11 @@ function PerReviewTable({ rows }: { rows: PerReviewMetric[] }) {
 
   return (
     <section>
-      <h2 className="section-label mb-4">Details pro Angebot</h2>
-      <div className="overflow-x-auto rounded-lg border border-border">
+      <h2 className="mb-3 text-sm font-semibold text-foreground">Details pro Angebot</h2>
+      <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/50 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border bg-muted/40 text-[11px] font-medium text-muted-foreground">
               <th className="px-4 py-3 text-left">Betreff</th>
               <th className="px-4 py-3 text-right">Pos.</th>
               <th className="px-4 py-3 text-right">Match-Rate</th>
@@ -129,17 +118,15 @@ function PerReviewTable({ rows }: { rows: PerReviewMetric[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
+            {rows.map((r) => (
               <tr
                 key={r.review_id}
-                className={`border-b border-border last:border-0 transition-colors hover:bg-muted/40 ${
-                  i % 2 === 0 ? "" : "bg-muted/10"
-                }`}
+                className="border-b border-border last:border-0 transition-colors hover:bg-muted/30"
               >
                 <td className="px-4 py-3">
                   <Link
                     to={`/reviews/${r.review_id}/positions`}
-                    className="font-medium text-foreground hover:underline"
+                    className="font-medium text-foreground hover:text-brand"
                   >
                     {r.subject || r.review_id}
                   </Link>
@@ -147,7 +134,9 @@ function PerReviewTable({ rows }: { rows: PerReviewMetric[] }) {
                 <td className="px-4 py-3 text-right tabular-nums">{r.positions}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{fmtPct(r.match_rate)}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{fmtEur(r.total_eur)}</td>
-                <td className="px-4 py-3 text-right tabular-nums">{r.duration_s > 0 ? r.duration_s.toFixed(1) : dash}</td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {r.duration_s > 0 ? r.duration_s.toFixed(1) : dash}
+                </td>
                 <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
                   {r.token_usage ? fmt(r.token_usage.input_tokens) : dash}
                 </td>
@@ -161,7 +150,7 @@ function PerReviewTable({ rows }: { rows: PerReviewMetric[] }) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">
                   Noch keine abgeschlossenen Angebote vorhanden.
                 </td>
               </tr>
@@ -190,9 +179,8 @@ export function StatusPage() {
         </p>
       </header>
 
-      <OperativeWirkung m={data} />
-      <AggregateMetrics m={data} />
-      <TokenMetrics m={data} />
+      <PipelineStats m={data} />
+      <TokenSummary m={data} />
       <PerReviewTable rows={data.per_review} />
     </PageContainer>
   );

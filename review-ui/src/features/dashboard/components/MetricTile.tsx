@@ -5,9 +5,20 @@ interface MetricTileProps {
   value: string | number;
   hint?: string;
   className?: string;
+  variant?: "card" | "stat";
 }
 
-export function MetricTile({ label, value, hint, className }: MetricTileProps) {
+export function MetricTile({ label, value, hint, className, variant = "card" }: MetricTileProps) {
+  if (variant === "stat") {
+    return (
+      <div className={cn("flex flex-col", className)}>
+        <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
+        <div className="mt-1 font-display text-2xl font-semibold tracking-tight">{value}</div>
+        {hint && <div className="mt-0.5 text-[11px] text-muted-foreground/70">{hint}</div>}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(

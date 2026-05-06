@@ -2,12 +2,21 @@ import {
   matchedCount,
   type ReviewSummary,
 } from "../schemas/reviewSummary";
-import { MetricTile } from "./MetricTile";
 
 const MINUTES_PER_MANUAL_REVIEW = 15;
 
 interface ValueMetricsProps {
   reviews: ReviewSummary[];
+}
+
+function StatCell({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+  return (
+    <div className="bg-surface px-5 py-4">
+      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+      <p className="mt-1.5 font-display text-xl font-semibold tracking-tight text-foreground">{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground/60">{hint}</p>}
+    </div>
+  );
 }
 
 export function ValueMetrics({ reviews }: ValueMetricsProps) {
@@ -20,27 +29,18 @@ export function ValueMetrics({ reviews }: ValueMetricsProps) {
 
   return (
     <section aria-label="Operative Wirkung">
-      <div className="section-label mb-3">Operative Wirkung</div>
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <MetricTile
-          label="Reviews"
-          value={total}
-          hint="Gesamtanzahl Anfragen"
-        />
-        <MetricTile
-          label="Ø Positionen"
-          value={avgPositions.toFixed(1)}
-          hint="pro Anfrage"
-        />
-        <MetricTile
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4">
+        <StatCell label="Reviews" value={total} hint="Anfragen gesamt" />
+        <StatCell label="Ø Positionen" value={avgPositions.toFixed(1)} hint="pro Anfrage" />
+        <StatCell
           label="Ø Match-Quote"
-          value={`${Math.round(avgMatchRate * 100)}%`}
+          value={`${Math.round(avgMatchRate * 100)} %`}
           hint="Stammdaten-Treffer"
         />
-        <MetricTile
+        <StatCell
           label="Zeitersparnis"
           value={`${hoursSaved.toFixed(1)} h`}
-          hint={`~${MINUTES_PER_MANUAL_REVIEW} min/Anfrage manuell`}
+          hint={`~${MINUTES_PER_MANUAL_REVIEW} min / Anfrage`}
         />
       </div>
     </section>
