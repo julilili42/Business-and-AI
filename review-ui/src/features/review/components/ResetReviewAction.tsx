@@ -20,21 +20,14 @@ export function ResetReviewAction({ reviewId }: ResetReviewActionProps) {
 
   if (!armed) {
     return (
-      <div className="space-y-2 rounded-md border border-danger/30 bg-danger-soft p-3">
-        <div className="text-xs font-bold text-danger">
-          Pipeline neu starten
-        </div>
-        <p className="text-[11.5px] leading-snug text-foreground/80">
-          Verarbeitet die Anfrage komplett neu. Bisherige Anpassungen gehen verloren.
-        </p>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="w-full border-danger/40 text-danger hover:bg-danger-soft hover:text-danger"
+      <div className="flex justify-end">
+        <button
+          type="button"
           onClick={() => setArmed(true)}
+          className="text-[11.5px] text-muted-foreground/60 hover:text-danger transition-colors"
         >
-          Neu starten
-        </Button>
+          Pipeline neu starten
+        </button>
       </div>
     );
   }

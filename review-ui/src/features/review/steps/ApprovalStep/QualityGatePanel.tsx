@@ -1,9 +1,37 @@
-import { AlertTriangle, ArrowRight, CheckCircle2, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, ShieldAlert, type LucideIcon } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
 import { cn } from "@/shared/lib/cn";
 
 import type { Issue, QualityGateResult } from "../../hooks/useQualityGate";
+
+type Severity = "blocker" | "warning";
+
+const SEVERITY_CONFIG: Record<Severity, {
+  Icon: LucideIcon;
+  color: string;
+  border: string;
+  bg: string;
+  linkBorder: string;
+  linkHover: string;
+}> = {
+  blocker: {
+    Icon: ShieldAlert,
+    color: "text-danger",
+    border: "border-danger/30",
+    bg: "bg-danger-soft",
+    linkBorder: "border-danger/40",
+    linkHover: "hover:bg-danger-soft",
+  },
+  warning: {
+    Icon: AlertTriangle,
+    color: "text-warning",
+    border: "border-warning/30",
+    bg: "bg-warning-soft",
+    linkBorder: "border-warning/40",
+    linkHover: "hover:bg-warning-soft",
+  },
+};
 
 interface QualityGatePanelProps {
   gate: QualityGateResult;
@@ -53,17 +81,10 @@ export function QualityGatePanel({ gate }: QualityGatePanelProps) {
       )}
     >
       <header className="mb-4 flex items-start gap-3">
-        {hasBlockers ? (
-          <ShieldAlert
-            className="mt-0.5 h-5 w-5 flex-shrink-0 text-danger"
-            aria-hidden="true"
-          />
-        ) : (
-          <AlertTriangle
-            className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning"
-            aria-hidden="true"
-          />
-        )}
+        {(() => {
+          const { Icon, color } = SEVERITY_CONFIG[hasBlockers ? "blocker" : "warning"];
+          return <Icon className={cn("mt-0.5 h-5 w-5 flex-shrink-0", color)} aria-hidden="true" />;
+        })()}
         <div>
           <div
             className={cn(
@@ -116,26 +137,19 @@ function IssueList({
   );
 }
 
-function IssueItem({
-  issue,
-  severity,
-}: {
-  issue: Issue;
-  severity: "blocker" | "warning";
-}) {
+function IssueItem({ issue, severity }: { issue: Issue; severity: Severity }) {
   const { reviewId } = useParams<{ reviewId: string }>();
   const target =
     reviewId && issue.step
       ? `/reviews/${encodeURIComponent(reviewId)}/${issue.step}`
       : null;
+  const cfg = SEVERITY_CONFIG[severity];
 
   return (
     <li
       className={cn(
         "flex items-start gap-3 rounded-md border p-3 text-sm",
-        severity === "blocker"
-          ? "border-danger/30 bg-danger-soft text-danger"
-          : "border-warning/30 bg-warning-soft text-warning",
+        cfg.border, cfg.bg, cfg.color,
       )}
     >
       <div className="flex-1">
@@ -146,10 +160,8 @@ function IssueItem({
         <Link
           to={target}
           className={cn(
-            "inline-flex shrink-0 items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-semibold",
-            severity === "blocker"
-              ? "border-danger/40 bg-surface text-danger hover:bg-danger-soft"
-              : "border-warning/40 bg-surface text-warning hover:bg-warning-soft",
+            "inline-flex shrink-0 items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-semibold bg-surface",
+            cfg.border, cfg.color, cfg.linkHover,
           )}
         >
           Beheben

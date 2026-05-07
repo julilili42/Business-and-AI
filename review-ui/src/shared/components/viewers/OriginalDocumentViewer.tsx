@@ -73,7 +73,7 @@ export function OriginalDocumentViewer({
           // Using a key that includes the page forces the iframe to reload
           // and jump to that page.
           const sourcePage = evidenceForThisFile?.source_page ?? null;
-          const renderUrl = `${url}?v=${Date.now()}${sourcePage ? `#page=${sourcePage}` : ""}`;
+          const renderUrl = `${url}?v=${sourcePage ?? 0}${sourcePage ? `#page=${sourcePage}` : ""}`;
           const iframeKey = `${name}-p${sourcePage ?? 0}`;
 
           return (

@@ -5,6 +5,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import logging
+_log = logging.getLogger("quoting.progress_store")
+
 PIPELINE_STEPS = [
     "Mail vorbereiten",
     "Extraktion",
@@ -149,7 +152,8 @@ def update_step(
 def complete_progress(review_dir: Path, result: dict[str, Any]) -> None:
     data = read_progress(review_dir)
     if data is None:
-        return
+        _log.warning("complete_progress: progress.json missing for %s — creating synthetic record", review_dir.name)
+        data = {"review_id": review_dir.name, "status": "running", "steps": [], "result": None, "error": None}
 
     now = _now_iso()
 
@@ -172,7 +176,8 @@ def complete_progress(review_dir: Path, result: dict[str, Any]) -> None:
 def fail_progress(review_dir: Path, error: str) -> None:
     data = read_progress(review_dir)
     if data is None:
-        return
+        _log.warning("fail_progress: progress.json missing for %s — creating synthetic record", review_dir.name)
+        data = {"review_id": review_dir.name, "status": "running", "steps": [], "result": None, "error": None}
 
     now = _now_iso()
 

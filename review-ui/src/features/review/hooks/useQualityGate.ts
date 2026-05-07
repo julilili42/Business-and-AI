@@ -54,6 +54,15 @@ export function useQualityGate(detail: ReviewDetail | undefined): QualityGateRes
 }
 
 function evaluate(detail: ReviewDetail | undefined): QualityGateResult {
+  if (detail === undefined) {
+    return {
+      blockers: [],
+      warnings: [],
+      canApprove: false,
+      stats: { totalPositions: 0, unmatched: 0, unmatchedWithoutPriceOverride: 0, lowConfidence: 0, matchRate: 1 },
+    };
+  }
+
   const blockers: Issue[] = [];
   const warnings: Issue[] = [];
 
@@ -72,7 +81,9 @@ function evaluate(detail: ReviewDetail | undefined): QualityGateResult {
       .map((o) => (o as { artikel_nr: string }).artikel_nr),
   );
 
-  const unmatched = matches.filter((m) => m.status === "no_match");
+  const activePosNrs = new Set((detail?.anfrage.positionen ?? []).map((p) => p.pos_nr));
+  const activeMatches = matches.filter((m) => activePosNrs.has(m.pos_nr));
+  const unmatched = activeMatches.filter((m) => m.status === "no_match");
   const unmatchedWithoutPriceOverride = unmatched.filter((m) => {
     if (overriddenPosNrs.has(m.pos_nr)) return false;
     if (m.matched_artikelnr && overriddenArticles.has(m.matched_artikelnr)) {
@@ -85,7 +96,7 @@ function evaluate(detail: ReviewDetail | undefined): QualityGateResult {
     (p) => p.confidence === "low",
   ).length;
 
-  const matchedCount = matches.filter((m) => m.status !== "no_match").length;
+  const matchedCount = activeMatches.filter((m) => m.status !== "no_match").length;
   const matchRate = totalPositions === 0 ? 1 : matchedCount / totalPositions;
 
   // ---------- Blockers ----------

@@ -18,8 +18,11 @@ export function KpiOverview({
   pdfReady,
 }: KpiOverviewProps) {
   const totalPositions = anfrage.positionen.length;
-  const matched = matches.filter((m) => m.status !== "no_match").length;
-  const matchRate = totalPositions > 0 ? matched / totalPositions : 0;
+  const activePosNrs = new Set(anfrage.positionen.map((p) => p.pos_nr));
+  const matched = matches.filter(
+    (m) => activePosNrs.has(m.pos_nr) && m.status !== "no_match",
+  ).length;
+  const matchRate = totalPositions > 0 ? Math.min(1, matched / totalPositions) : 0;
 
   const totalMarginEur = quotation
     ? quotation.items.reduce((sum, it) => sum + (it.margin_eur ?? 0), 0)

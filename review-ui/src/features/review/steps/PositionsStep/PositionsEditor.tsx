@@ -68,6 +68,16 @@ export function PositionsEditor({
   // auto-expand them and visually distinguish them.
   const newlyAddedRef = useRef<Set<number>>(new Set());
 
+  const activePosNrs = useMemo(
+    () => new Set(anfrage.positionen.map((p) => p.pos_nr)),
+    [anfrage.positionen],
+  );
+
+  const activeMatches = useMemo(
+    () => matches.filter((m) => activePosNrs.has(m.pos_nr)),
+    [matches, activePosNrs],
+  );
+
   const matchesByPos = useMemo(() => {
     const map = new Map<number, MatchResult>();
     for (const m of matches) map.set(m.pos_nr, m);
@@ -190,7 +200,7 @@ export function PositionsEditor({
             Positionen prüfen
           </h2>
           <ChangedFieldsIndicator />
-          <MatchSummary matches={matches} />
+          <MatchSummary matches={activeMatches} />
         </div>
 
         {saveAndRegenerate.isPending && (
@@ -200,7 +210,7 @@ export function PositionsEditor({
         )}
         {saveAndRegenerate.isError && (
           <span className="text-xs font-semibold text-danger">
-            Speichern fehlgeschlagen — bitte erneut versuchen.
+            PDF-Neuberechnung fehlgeschlagen — Daten wurden gespeichert. Bitte erneut versuchen.
           </span>
         )}
       </header>

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { stammdatenApi } from "@/shared/api/stammdaten";
 
-import { reviewQueryKey } from "./useReview";
+import { reviewQueryKey } from "@/shared/api/queryKeys";
 
 /**
  * Live stammdaten search.

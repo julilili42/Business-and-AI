@@ -1,11 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { approvalApi, type ApprovalTransitionInput } from "@/shared/api/approval";
+import { approvalQueryKey, reviewQueryKey } from "@/shared/api/queryKeys";
 
-import { reviewQueryKey } from "./useReview";
-
-export const approvalQueryKey = (reviewId: string) =>
-  ["reviews", "approval", reviewId] as const;
+export { approvalQueryKey };
 
 export function useApproval(reviewId: string | undefined) {
   return useQuery({

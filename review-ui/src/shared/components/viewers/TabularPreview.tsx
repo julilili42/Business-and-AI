@@ -34,7 +34,7 @@ export function TabularPreview({ reviewId, fileName, highlightRow }: TabularPrev
   const highlightRef = useRef<HTMLTableRowElement>(null);
 
   useEffect(() => {
-    if (highlightRef.current) {
+    if (highlightRow != null && highlightRef.current) {
       highlightRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }, [highlightRow]);

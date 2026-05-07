@@ -1,25 +1,26 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Save } from "lucide-react";
-import { useEffect } from "react";
+import { Building2, FileText, Gauge, Save, Settings2, User } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/shared/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { ErrorState } from "@/shared/components/feedback/ErrorState";
 import { LoadingState } from "@/shared/components/feedback/LoadingState";
 import { PageContainer } from "@/shared/components/layout/PageContainer";
+import { cn } from "@/shared/lib/cn";
 import { appSettingsSchema, type AppSettings } from "@/shared/schemas/settings";
 
 import { useSaveSettings, useSettings } from "./hooks/useSettings";
 
-/**
- * Settings page.
- *
- * Form state comes from a single zod schema — the same one the API
- * validates against. There's no client-only validation that the server
- * doesn't already enforce.
- */
 export function SettingsPage() {
   const { data, isLoading, isError, error } = useSettings();
   const save = useSaveSettings();
@@ -46,18 +47,18 @@ export function SettingsPage() {
           Einstellungen<span className="text-brand">.</span>
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
-          Hinterlege Firmendaten, Kontaktinformationen und allgemeine
-          Angebotsstandards. Diese Werte werden automatisch in jedes
-          Angebots-PDF übernommen.
+          Firmendaten, Kontaktinformationen und Angebotsstandards — werden
+          automatisch in jedes Angebots-PDF übernommen.
         </p>
       </header>
-      <SettingsForm initial={data} onSave={(s) => save.mutate(s)} saving={save.isPending} />
-      {save.isSuccess && (
-        <p className="mt-4 text-sm font-semibold text-success">
-          Einstellungen gespeichert.
-        </p>
-      )}
-      {save.isError && <ErrorState className="mt-4" error={save.error} />}
+
+      <SettingsForm
+        initial={data}
+        onSave={(s) => save.mutate(s)}
+        saving={save.isPending}
+        saveSuccess={save.isSuccess}
+        saveError={save.isError ? save.error : null}
+      />
     </PageContainer>
   );
 }
@@ -65,10 +66,12 @@ export function SettingsPage() {
 interface SettingsFormProps {
   initial: AppSettings;
   saving: boolean;
+  saveSuccess: boolean;
+  saveError: unknown;
   onSave: (settings: AppSettings) => void;
 }
 
-function SettingsForm({ initial, saving, onSave }: SettingsFormProps) {
+function SettingsForm({ initial, saving, saveSuccess, saveError, onSave }: SettingsFormProps) {
   const form = useForm<AppSettings>({
     resolver: zodResolver(appSettingsSchema),
     defaultValues: initial,
@@ -76,40 +79,56 @@ function SettingsForm({ initial, saving, onSave }: SettingsFormProps) {
 
   useEffect(() => form.reset(initial), [initial, form]);
 
+  const isDirty = form.formState.isDirty;
+
   return (
     <form
-      className="space-y-8"
+      className="space-y-5"
       onSubmit={form.handleSubmit((values) => onSave(values))}
     >
-      <Section title="Firmendaten (Absender)">
+      {/* Firmendaten */}
+      <SettingsCard
+        icon={<Building2 className="h-4 w-4" />}
+        title="Firmendaten"
+        description="Absenderinformationen die im Angebots-PDF erscheinen"
+      >
         <Grid>
           <Field label="Firmenname">
-            <Input {...form.register("company.company_name")} />
+            <Input placeholder="Muster GmbH" {...form.register("company.company_name")} />
           </Field>
           <Field label="Land">
-            <Input {...form.register("company.company_country")} />
+            <Input placeholder="Deutschland" {...form.register("company.company_country")} />
           </Field>
           <Field label="Straße & Hausnummer">
-            <Input {...form.register("company.company_address")} />
+            <Input placeholder="Musterstraße 1" {...form.register("company.company_address")} />
           </Field>
           <Field label="PLZ & Ort">
-            <Input {...form.register("company.company_zip_city")} />
+            <Input placeholder="12345 Musterstadt" {...form.register("company.company_zip_city")} />
           </Field>
         </Grid>
-      </Section>
+      </SettingsCard>
 
-      <Section title="Kontaktperson für Angebote">
+      {/* Kontaktperson */}
+      <SettingsCard
+        icon={<User className="h-4 w-4" />}
+        title="Kontaktperson"
+        description="Ansprechpartner der im Angebot als Unterzeichner gedruckt wird"
+      >
         <Grid>
           <Field label="Name">
-            <Input {...form.register("company.contact_person")} />
+            <Input placeholder="Max Mustermann" {...form.register("company.contact_person")} />
           </Field>
           <Field label="Telefon">
-            <Input {...form.register("company.contact_phone")} />
+            <Input placeholder="+49 30 123456" {...form.register("company.contact_phone")} />
           </Field>
           <Field label="E-Mail">
-            <Input type="email" {...form.register("company.contact_email")} />
+            <Input
+              type="email"
+              placeholder="angebot@muster.de"
+              {...form.register("company.contact_email")}
+            />
           </Field>
-          <Field label="Angebotsgültigkeit (Tage)">
+          <Field label="Angebotsgültigkeit" hint="Tage">
             <Input
               type="number"
               min={1}
@@ -118,88 +137,152 @@ function SettingsForm({ initial, saving, onSave }: SettingsFormProps) {
             />
           </Field>
         </Grid>
-      </Section>
+      </SettingsCard>
 
-      <Section title="Kommerzielle Standardwerte">
+      {/* Kommerzielle Standards */}
+      <SettingsCard
+        icon={<FileText className="h-4 w-4" />}
+        title="Kommerzielle Standards"
+        description="Standardkonditionen die in neue Angebote übernommen werden"
+      >
         <Grid>
           <Field label="Lieferbedingung">
-            <Input {...form.register("company.delivery_term")} />
+            <Input placeholder="EXW Werk" {...form.register("company.delivery_term")} />
           </Field>
           <Field label="Zahlungsbedingung">
-            <Input {...form.register("company.payment_term")} />
+            <Input placeholder="30 Tage netto" {...form.register("company.payment_term")} />
           </Field>
         </Grid>
-      </Section>
+      </SettingsCard>
 
-      <Section title="Matching">
+      {/* Matching */}
+      <SettingsCard
+        icon={<Gauge className="h-4 w-4" />}
+        title="Matching"
+        description="Schwellenwerte für das automatische Positions-Matching gegen den Stammdatenbestand"
+      >
         <Grid>
-          <Field label="Fuzzy-Schwelle (50–100)">
+          <Field label="Fuzzy-Schwelle" hint="50 – 100">
             <Input
               type="number"
               min={50}
               max={100}
               {...form.register("matching.fuzzy_threshold", { valueAsNumber: true })}
             />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Mindestähnlichkeit für Text-basiertes Matching
+            </p>
           </Field>
-          <Field label="Semantische Schwelle (40–100)">
+          <Field label="Semantische Schwelle" hint="40 – 100">
             <Input
               type="number"
               min={40}
               max={100}
               {...form.register("matching.semantic_threshold", { valueAsNumber: true })}
             />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Mindestähnlichkeit für Embedding-basiertes Matching
+            </p>
           </Field>
         </Grid>
-      </Section>
+      </SettingsCard>
 
-      <Section title="Workflow">
-        <Toggle
-          label="PDF nach jeder Änderung automatisch neu generieren"
-          checked={form.watch("workflow.auto_refresh_pdf")}
-          onCheckedChange={(v) => form.setValue("workflow.auto_refresh_pdf", v)}
-        />
-        <Toggle
-          label="Vor Pipeline-Reset bestätigen"
-          checked={form.watch("workflow.confirm_before_reset")}
-          onCheckedChange={(v) => form.setValue("workflow.confirm_before_reset", v)}
-        />
-      </Section>
+      {/* Workflow */}
+      <SettingsCard
+        icon={<Settings2 className="h-4 w-4" />}
+        title="Workflow"
+        description="Verhalten der Review-Oberfläche"
+      >
+        <div className="divide-y divide-border">
+          <Toggle
+            label="PDF automatisch neu generieren"
+            description="PDF wird nach jeder Änderung im Hintergrund neu berechnet"
+            checked={form.watch("workflow.auto_refresh_pdf")}
+            onCheckedChange={(v) => form.setValue("workflow.auto_refresh_pdf", v, { shouldDirty: true })}
+          />
+          <Toggle
+            label="Reset bestätigen"
+            description="Vor dem Pipeline-Reset wird ein Bestätigungsdialog gezeigt"
+            checked={form.watch("workflow.confirm_before_reset")}
+            onCheckedChange={(v) => form.setValue("workflow.confirm_before_reset", v, { shouldDirty: true })}
+          />
+        </div>
+      </SettingsCard>
 
-      <div className="flex items-center gap-3 border-t border-border pt-6">
-        <Button variant="primary" type="submit" disabled={saving}>
-          <Save className="h-4 w-4" aria-hidden="true" />
-          {saving ? "Speichere…" : "Speichern"}
-        </Button>
+      {/* Save bar */}
+      <div className="sticky bottom-0 z-10 -mx-4 border-t border-border bg-background/90 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6">
+        <div className="flex items-center justify-between gap-4">
+          <span className={cn("text-xs text-muted-foreground transition-opacity", isDirty ? "opacity-100" : "opacity-0")}>
+            Ungespeicherte Änderungen
+          </span>
+          <div className="flex items-center gap-3">
+            {saveSuccess && !isDirty && (
+              <span className="text-xs font-medium text-success">Gespeichert</span>
+            )}
+            {saveError && (
+              <span className="text-xs font-medium text-danger">Speichern fehlgeschlagen</span>
+            )}
+            <Button variant="primary" type="submit" disabled={saving || !isDirty}>
+              <Save className="h-4 w-4" aria-hidden="true" />
+              {saving ? "Speichere…" : "Speichern"}
+            </Button>
+          </div>
+        </div>
       </div>
     </form>
   );
 }
 
-function Section({
+function SettingsCard({
+  icon,
   title,
+  description,
   children,
 }: {
+  icon: ReactNode;
   title: string;
-  children: React.ReactNode;
+  description: string;
+  children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-surface p-5 shadow-card">
-      <h2 className="mb-4 font-display text-base font-bold tracking-tight">
-        {title}
-      </h2>
-      <div className="space-y-3">{children}</div>
-    </section>
+    <Card>
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-soft text-brand">
+            {icon}
+          </span>
+          <div>
+            <CardTitle className="text-sm">{title}</CardTitle>
+            <CardDescription className="mt-0.5 text-[11px]">{description}</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   );
 }
 
-function Grid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">{children}</div>;
+function Grid({ children }: { children: ReactNode }) {
+  return <div className="grid grid-cols-1 gap-x-5 gap-y-4 md:grid-cols-2">{children}</div>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">{label}</Label>
+      <Label className="text-xs">
+        {label}
+        {hint && (
+          <span className="ml-1 font-normal text-muted-foreground">· {hint}</span>
+        )}
+      </Label>
       {children}
     </div>
   );
@@ -207,22 +290,41 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Toggle({
   label,
+  description,
   checked,
   onCheckedChange,
 }: {
   label: string;
+  description?: string;
   checked: boolean;
   onCheckedChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-4 rounded-md border border-border bg-surface px-4 py-3 text-sm">
-      <span className="font-medium">{label}</span>
-      <input
-        type="checkbox"
-        className="h-4 w-4 rounded border-input"
-        checked={checked}
-        onChange={(e) => onCheckedChange(e.target.checked)}
-      />
-    </label>
+    <div className="flex items-center justify-between gap-6 py-3.5">
+      <div>
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {description && (
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{description}</p>
+        )}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onCheckedChange(!checked)}
+        className={cn(
+          "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+          checked ? "bg-brand" : "bg-muted",
+        )}
+      >
+        <span
+          className={cn(
+            "pointer-events-none block h-4 w-4 rounded-full bg-white shadow-md transition-transform",
+            checked ? "translate-x-4" : "translate-x-0",
+          )}
+        />
+      </button>
+    </div>
   );
 }

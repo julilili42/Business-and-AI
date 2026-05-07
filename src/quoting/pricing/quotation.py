@@ -105,20 +105,11 @@ def _build_item(
         warnings.append(f"Pos {pos.pos_nr}: {match.status} match on {artikel_nr}")
 
     base_price, zkalk = _resolve_price(artikel_nr, match, price_overrides)
-
-    # Certificates: flat surcharge, no discount, no qty multiplication
-    if pos.ist_zertifikat:
-        einzelpreis = base_price + zkalk
-        rabatt = 0.0
-        gesamtpreis = einzelpreis
-        cost = base_price
-        if not bemerkung:
-            bemerkung = "Certificate - flat surcharge"
-    else:
-        rabatt = volume_discount(pos.menge)
-        einzelpreis = base_price * (1 - rabatt) + zkalk
-        gesamtpreis = einzelpreis * pos.menge
-        cost = base_price * pos.menge
+    einzelpreis, rabatt, gesamtpreis, cost = _calculate_item_prices(
+        base_price, zkalk, pos.menge, pos.ist_zertifikat
+    )
+    if pos.ist_zertifikat and not bemerkung:
+        bemerkung = "Certificate - flat surcharge"
 
     gesamtpreis_r = round(gesamtpreis, 2)
     margin_eur = round(gesamtpreis_r - cost, 2)
@@ -143,6 +134,21 @@ def _build_item(
     )
 
 
+def _calculate_item_prices(
+    base_price: float,
+    zkalk: float,
+    menge: float,
+    ist_zertifikat: bool,
+) -> tuple[float, float, float, float]:
+    """Return (einzelpreis, rabatt, gesamtpreis, cost)."""
+    if ist_zertifikat:
+        einzelpreis = base_price + zkalk
+        return einzelpreis, 0.0, einzelpreis, base_price
+    rabatt = volume_discount(menge)
+    einzelpreis = base_price * (1 - rabatt) + zkalk
+    return einzelpreis, rabatt, einzelpreis * menge, base_price * menge
+
+
 def _resolve_price(
     artikel_nr: str,
     match: MatchResult,
@@ -156,9 +162,9 @@ def _resolve_price(
         row = match.matched_row
         try:
             return (
-                float(row.get("basispreis_eur", 0) or 0),
-                float(row.get("zkalk_offset_eur", 0) or 0),
+                float(row.get("basispreis_eur", 0)),
+                float(row.get("zkalk_offset_eur", 0)),
             )
-        except ValueError:
-            return 0.0, 0.0
+        except (ValueError, TypeError):
+            pass
     return 0.0, 0.0

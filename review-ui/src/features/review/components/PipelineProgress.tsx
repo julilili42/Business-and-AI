@@ -1,8 +1,18 @@
-import { AlertTriangle, Check, Clock, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, Clock, Loader2, type LucideIcon } from "lucide-react";
 
 import { Progress } from "@/shared/components/ui/progress";
 import { cn } from "@/shared/lib/cn";
 import type { PipelineProgress as TPipelineProgress } from "@/shared/schemas/progress";
+
+type StepStatus = "completed" | "running" | "failed" | "pending" | "skipped";
+
+const STEP_STATUS_CONFIG: Record<StepStatus, { Icon: LucideIcon; tone: string }> = {
+  completed: { Icon: Check,          tone: "border-success/30 bg-success-soft text-success" },
+  skipped:   { Icon: Check,          tone: "border-success/30 bg-success-soft text-success" },
+  running:   { Icon: Loader2,        tone: "border-info/30 bg-info-soft text-info" },
+  failed:    { Icon: AlertTriangle,  tone: "border-danger/30 bg-danger-soft text-danger" },
+  pending:   { Icon: Clock,          tone: "border-border bg-surface text-muted-foreground" },
+};
 
 interface PipelineProgressProps {
   progress: TPipelineProgress;
@@ -45,30 +55,12 @@ export function PipelineProgress({ progress }: PipelineProgressProps) {
 
       <ol className="space-y-2" aria-label="Pipeline-Schritte">
         {progress.steps.map((step) => {
-          const Icon =
-            step.status === "completed"
-              ? Check
-              : step.status === "running"
-                ? Loader2
-                : step.status === "failed"
-                  ? AlertTriangle
-                  : Clock;
-          const tone =
-            step.status === "completed"
-              ? "border-success/30 bg-success-soft text-success"
-              : step.status === "running"
-                ? "border-info/30 bg-info-soft text-info"
-                : step.status === "failed"
-                  ? "border-danger/30 bg-danger-soft text-danger"
-                  : "border-border bg-surface text-muted-foreground";
-
+          const { Icon, tone } =
+            STEP_STATUS_CONFIG[step.status as StepStatus] ?? STEP_STATUS_CONFIG.pending;
           return (
             <li
               key={step.name}
-              className={cn(
-                "flex items-start gap-3 rounded-md border px-3 py-2 text-sm",
-                tone,
-              )}
+              className={cn("flex items-start gap-3 rounded-md border px-3 py-2 text-sm", tone)}
             >
               <Icon
                 className={cn(
@@ -88,7 +80,7 @@ export function PipelineProgress({ progress }: PipelineProgressProps) {
         })}
       </ol>
 
-      {progress.error && (
+      {progress.status === "failed" && progress.error && (
         <div className="mt-4 rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
           {progress.error}
         </div>

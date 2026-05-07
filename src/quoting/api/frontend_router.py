@@ -14,6 +14,7 @@ Do not include ``frontend_router_phase3`` separately anymore.
 
 from __future__ import annotations
 
+import logging
 import math
 import shutil
 import uuid
@@ -32,7 +33,7 @@ from quoting.ingestion import Mail, detect_file_type, mail_from_file, parse_mail
 from quoting.matching import MatchResult, match_positions
 from quoting.output import build_draft_pdf
 from quoting.pipeline import QuotingPipeline
-from quoting.pricing import build_quotation
+from quoting.pricing import Quotation, build_quotation
 from quoting.reviews import (
     draft_pdf_filename,
     final_pdf_filename,
@@ -46,6 +47,7 @@ from quoting.reviews import (
 )
 from quoting.ui.review_agent import apply_manual_overrides
 
+log = logging.getLogger("quoting.frontend_router")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 REVIEW_DIR = PROJECT_ROOT / "data" / "reviews"
@@ -75,6 +77,44 @@ def _review_dir(review_id: str) -> Path:
 # Reviews: list & detail
 # ============================================================================
 
+def _extract_summary_metrics(summary: dict) -> tuple[int, float, float, float]:
+    """Return (positions, total_eur, duration_s, match_rate) from a progress summary."""
+    positions = int(summary.get("positions") or 0)
+    total_eur = float(summary.get("total_eur") or 0.0)
+    duration_s = float(summary.get("duration_s") or 0.0)
+    matched = (
+        int(summary.get("exact") or 0)
+        + int(summary.get("fuzzy") or 0)
+        + int(summary.get("semantic") or 0)
+    )
+    match_rate = matched / positions if positions > 0 else 0.0
+    return positions, total_eur, duration_s, match_rate
+
+
+def _format_mail_dict(mail_meta: dict) -> dict:
+    return {
+        "subject": str(mail_meta.get("subject") or ""),
+        "from": str(mail_meta.get("from") or mail_meta.get("sender") or ""),
+        "body": str(mail_meta.get("body") or ""),
+        "attachments": list(mail_meta.get("attachments") or []),
+    }
+
+
+def _upsert_match(matches: list, new_match: MatchResult) -> list:
+    """Replace an existing match by pos_nr, or append if not found."""
+    updated = []
+    replaced = False
+    for m in matches:
+        if m.pos_nr == new_match.pos_nr:
+            updated.append(new_match)
+            replaced = True
+        else:
+            updated.append(m)
+    if not replaced:
+        updated.append(new_match)
+    return updated
+
+
 @router.get("/metrics")
 def get_metrics() -> dict:
     per_review = []
@@ -102,16 +142,7 @@ def get_metrics() -> dict:
             agg["completed_reviews"] += 1
 
         summary = (progress.get("result") or {}).get("summary") or {}
-        positions = int(summary.get("positions") or 0)
-        total_eur = float(summary.get("total_eur") or 0.0)
-        duration_s = float(summary.get("duration_s") or 0.0)
-
-        matched = (
-            int(summary.get("exact") or 0)
-            + int(summary.get("fuzzy") or 0)
-            + int(summary.get("semantic") or 0)
-        )
-        match_rate = matched / positions if positions > 0 else 0.0
+        positions, total_eur, duration_s, match_rate = _extract_summary_metrics(summary)
 
         agg["total_positions"] += positions
         agg["total_eur"] += total_eur
@@ -143,15 +174,15 @@ def get_metrics() -> dict:
             "token_usage": token_row,
         })
 
-    rd = agg.pop("reviews_with_duration") or 1
-    rm = agg.pop("reviews_with_match") or 1
-    sd = agg.pop("sum_duration_s")
-    sm = agg.pop("sum_match_rate")
+    reviews_with_duration = agg.pop("reviews_with_duration") or 1
+    reviews_with_match = agg.pop("reviews_with_match") or 1
+    sum_duration_s = agg.pop("sum_duration_s")
+    sum_match_rate = agg.pop("sum_match_rate")
 
     return {
         **agg,
-        "avg_duration_s": round(sd / rd, 2),
-        "avg_match_rate": round(sm / rm, 3),
+        "avg_duration_s": round(sum_duration_s / reviews_with_duration, 2),
+        "avg_match_rate": round(sum_match_rate / reviews_with_match, 3),
         "per_review": per_review,
     }
 
@@ -209,12 +240,7 @@ def get_review_detail(review_id: str) -> dict:
         "matches": [m.to_dict() for m in matches],
         "quotation": quotation.to_dict() if quotation else None,
         "manual_overrides": overrides,
-        "mail": {
-            "subject": str(mail_meta.get("subject") or ""),
-            "from": str(mail_meta.get("from") or mail_meta.get("sender") or ""),
-            "body": str(mail_meta.get("body") or ""),
-            "attachments": list(mail_meta.get("attachments") or []),
-        },
+        "mail": _format_mail_dict(mail_meta),
         "has_draft_pdf": find_draft_pdf(folder, review_id) is not None,
         "has_final_pdf": find_final_pdf(folder, review_id) is not None,
     }
@@ -225,12 +251,7 @@ def get_review_mail(review_id: str) -> dict:
     folder = _review_dir(review_id)
     meta = load_mail_meta(folder) or {}
 
-    return {
-        "subject": str(meta.get("subject") or ""),
-        "from": str(meta.get("from") or meta.get("sender") or ""),
-        "body": str(meta.get("body") or ""),
-        "attachments": list(meta.get("attachments") or []),
-    }
+    return _format_mail_dict(meta)
 
 
 # ============================================================================
@@ -482,33 +503,63 @@ def put_overrides(review_id: str, payload: list[dict]) -> list[dict]:
     return payload
 
 
+def _load_review_data(
+    folder: Path, review_id: str, pipeline: QuotingPipeline
+) -> tuple:
+    """Load anfrage, matches, and overrides for a review."""
+    try:
+        anfrage = _load_or_extract_anfrage(folder, review_id)
+    except Exception as exc:
+        log.exception("load_review_data: anfrage load failed for %s", review_id)
+        raise HTTPException(422, f"Anfrage konnte nicht geladen werden: {exc}") from exc
+
+    try:
+        matches = _load_or_recompute_matches(folder, anfrage, pipeline)
+    except Exception as exc:
+        log.exception("load_review_data: match recompute failed for %s", review_id)
+        raise HTTPException(422, f"Matching fehlgeschlagen: {exc}") from exc
+
+    overrides = read_json(folder / "manual_overrides.json") or []
+    return anfrage, matches, overrides
+
+
+def _build_quotation_with_overrides(
+    anfrage: Anfrage,
+    matches: list,
+    overrides: list,
+    preise_path: Path,
+    review_id: str,
+) -> Quotation:
+    """Build quotation and apply manual overrides."""
+    try:
+        quotation = build_quotation(anfrage, matches, preise_path)
+        if isinstance(overrides, list) and overrides:
+            quotation, _ = apply_manual_overrides(quotation, anfrage, overrides, lang="de")
+        return quotation
+    except Exception as exc:
+        log.exception("build_quotation_with_overrides: pricing failed for %s", review_id)
+        raise HTTPException(422, f"Preisberechnung fehlgeschlagen: {exc}") from exc
+
+
 @router.post("/reviews/{review_id}/regenerate")
 def regenerate_quotation(review_id: str) -> dict:
     folder = _review_dir(review_id)
     pipeline = _get_pipeline()
 
-    anfrage = _load_or_extract_anfrage(folder, review_id)
-    matches = _load_or_recompute_matches(folder, anfrage, pipeline)
-    overrides = read_json(folder / "manual_overrides.json") or []
-
+    anfrage, matches, overrides = _load_review_data(folder, review_id, pipeline)
     company_profile = load_user_settings().company
-    quotation = build_quotation(anfrage, matches, pipeline.settings.preise_path)
-
-    if isinstance(overrides, list) and overrides:
-        quotation, _ = apply_manual_overrides(quotation, anfrage, overrides, lang="de")
-
-    pdf_path = folder / draft_pdf_filename(review_id)
-
-    build_draft_pdf(
-        anfrage,
-        quotation,
-        pdf_path,
-        is_final=False,
-        company_profile=company_profile,
+    quotation = _build_quotation_with_overrides(
+        anfrage, matches, overrides, pipeline.settings.preise_path, review_id
     )
 
-    write_json(folder / "quotation_reviewed.json", quotation.to_dict())
+    pdf_path = folder / draft_pdf_filename(review_id)
+    try:
+        build_draft_pdf(anfrage, quotation, pdf_path, is_final=False, company_profile=company_profile)
+    except Exception as exc:
+        log.exception("regenerate: PDF build failed for %s", review_id)
+        raise HTTPException(422, f"PDF-Erstellung fehlgeschlagen: {exc}") from exc
 
+    write_json(folder / "quotation_reviewed.json", quotation.to_dict())
     return quotation.to_dict()
 
 
@@ -521,33 +572,30 @@ def finalize_quotation(review_id: str, payload: FinalizeRequest) -> dict:
     folder = _review_dir(review_id)
     pipeline = _get_pipeline()
 
-    anfrage = _load_or_extract_anfrage(folder, review_id)
-    matches = _load_or_recompute_matches(folder, anfrage, pipeline)
-    overrides = read_json(folder / "manual_overrides.json") or []
-
+    anfrage, matches, overrides = _load_review_data(folder, review_id, pipeline)
     company_profile = load_user_settings().company
-    quotation = build_quotation(anfrage, matches, pipeline.settings.preise_path)
-
-    if isinstance(overrides, list) and overrides:
-        quotation, _ = apply_manual_overrides(quotation, anfrage, overrides, lang="de")
+    quotation = _build_quotation_with_overrides(
+        anfrage, matches, overrides, pipeline.settings.preise_path, review_id
+    )
 
     final_path = folder / final_pdf_filename(review_id)
+    try:
+        build_draft_pdf(anfrage, quotation, final_path, is_final=True, company_profile=company_profile)
+    except Exception as exc:
+        log.exception("finalize: PDF build failed for %s", review_id)
+        raise HTTPException(422, f"Final-PDF konnte nicht erstellt werden: {exc}") from exc
 
-    build_draft_pdf(
-        anfrage,
-        quotation,
-        final_path,
-        is_final=True,
-        company_profile=company_profile,
-    )
-
-    record = transition(
-        folder,
-        target="approved",
-        actor=payload.actor,
-        warning_acknowledged=True,
-        final_pdf_path=final_path.name,
-    )
+    try:
+        record = transition(
+            folder,
+            target="approved",
+            actor=payload.actor,
+            warning_acknowledged=True,
+            final_pdf_path=final_path.name,
+        )
+    except Exception as exc:
+        log.exception("finalize: approval transition failed for %s (PDF was written)", review_id)
+        raise HTTPException(500, f"Status-Übergang fehlgeschlagen: {exc}") from exc
 
     return {"final_pdf_path": record.final_pdf_path or final_path.name}
 
@@ -725,19 +773,7 @@ def _set_manual_match(review_id: str, pos_nr: int, artikel_nr: str) -> dict:
         matched_row=record.to_row(),
     )
 
-    updated: list[MatchResult] = []
-    replaced = False
-
-    for match in matches:
-        if match.pos_nr == pos_nr:
-            updated.append(new_match)
-            replaced = True
-        else:
-            updated.append(match)
-
-    if not replaced:
-        updated.append(new_match)
-
+    updated = _upsert_match(matches, new_match)
     write_json(folder / "matches_reviewed.json", [m.to_dict() for m in updated])
     _invalidate_approval(folder)
 

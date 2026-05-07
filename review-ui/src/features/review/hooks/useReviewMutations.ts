@@ -4,8 +4,7 @@ import { reviewsApi } from "@/shared/api/reviews";
 import type { Anfrage } from "@/shared/schemas/anfrage";
 import type { ManualOverride } from "@/shared/schemas/quotation";
 
-import { approvalQueryKey } from "./useApproval";
-import { reviewQueryKey } from "./useReview";
+import { approvalQueryKey, reviewQueryKey } from "@/shared/api/queryKeys";
 
 /**
  * Persist edits + rebuild draft PDF.

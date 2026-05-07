@@ -24,7 +24,6 @@ from typing import Literal
 
 from quoting.reviews import read_json, write_json
 
-
 ApprovalState = Literal[
     "draft_generated",
     "reviewed",
@@ -56,7 +55,7 @@ class ApprovalRecord:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict | None) -> "ApprovalRecord":
+    def from_dict(cls, data: dict | None) -> ApprovalRecord:
         if not isinstance(data, dict):
             return cls()
         return cls(
@@ -100,28 +99,17 @@ def transition(
     """Move the review to a new state, recording who/when in history."""
     record = load_approval(review_dir)
 
-    if target not in VALID_TRANSITIONS.get(record.state, set()) and target != record.state:
-        # Allow lateral transitions during prototyping but log them.
-        record.history.append({
-            "at": _now_iso(),
-            "from": record.state,
-            "to": target,
-            "actor": actor,
-            "warning": "non-standard transition",
-        })
-    else:
-        record.history.append({
-            "at": _now_iso(),
-            "from": record.state,
-            "to": target,
-            "actor": actor,
-        })
+    is_nonstandard = target not in VALID_TRANSITIONS.get(record.state, set()) and target != record.state
+    entry: dict = {"at": _now_iso(), "from": record.state, "to": target, "actor": actor}
+    if is_nonstandard:
+        entry["warning"] = "non-standard transition"
+    record.history.append(entry)
 
     record.state = target
     if target == "approved":
         record.approved_by = actor
         record.approved_at = _now_iso()
-    if target == "ready_to_send":
+    elif target == "ready_to_send":
         record.sent_at = _now_iso()
     if final_pdf_path is not None:
         record.final_pdf_path = final_pdf_path

@@ -56,63 +56,78 @@ def _match_one(
     fuzzy_threshold: int,
     semantic_threshold: int,
 ) -> MatchResult:
-    artikel_nrs = [row["artikel_nr"] for row in stammdaten]
+    return (
+        _exact_match(pos, stammdaten)
+        or _fuzzy_match(pos, stammdaten, fuzzy_threshold)
+        or _composite_match(pos, stammdaten, semantic_threshold)
+        or MatchResult(pos_nr=pos.pos_nr, status="no_match", score=0.0)
+    )
 
-    # 1. Exact match (normalized)
+
+def _exact_match(pos: Position, stammdaten: list[dict]) -> MatchResult | None:
     normalized = _normalize(pos.artikelnummer)
-    if normalized:
-        for i, nr in enumerate(artikel_nrs):
-            if _normalize(nr) == normalized:
-                return MatchResult(
-                    pos_nr=pos.pos_nr,
-                    status="exact",
-                    score=1.0,
-                    matched_artikelnr=nr,
-                    matched_bezeichnung=stammdaten[i]["bezeichnung"],
-                    matched_row=stammdaten[i],
-                )
+    if not normalized:
+        return None
+    for row in stammdaten:
+        if _normalize(row["artikel_nr"]) == normalized:
+            return MatchResult(
+                pos_nr=pos.pos_nr,
+                status="exact",
+                score=1.0,
+                matched_artikelnr=row["artikel_nr"],
+                matched_bezeichnung=row["bezeichnung"],
+                matched_row=row,
+            )
+    return None
 
-    # 2. Fuzzy match on article number
-    if pos.artikelnummer:
-        hit = process.extractOne(pos.artikelnummer, artikel_nrs, scorer=fuzz.ratio)
-        if hit:
-            nr, score, idx = hit
-            if score >= fuzzy_threshold:
-                return MatchResult(
-                    pos_nr=pos.pos_nr,
-                    status="fuzzy",
-                    score=score / 100.0,
-                    matched_artikelnr=nr,
-                    matched_bezeichnung=stammdaten[idx]["bezeichnung"],
-                    matched_row=stammdaten[idx],
-                )
 
-    # 3. Composite match: description + material (token-set)
+def _fuzzy_match(pos: Position, stammdaten: list[dict], threshold: int) -> MatchResult | None:
+    if not pos.artikelnummer:
+        return None
+    artikel_nrs = [row["artikel_nr"] for row in stammdaten]
+    hit = process.extractOne(pos.artikelnummer, artikel_nrs, scorer=fuzz.ratio)
+    if not hit:
+        return None
+    nr, score, idx = hit
+    if score < threshold:
+        return None
+    return MatchResult(
+        pos_nr=pos.pos_nr,
+        status="fuzzy",
+        score=score / 100.0,
+        matched_artikelnr=nr,
+        matched_bezeichnung=stammdaten[idx]["bezeichnung"],
+        matched_row=stammdaten[idx],
+    )
+
+
+def _composite_match(pos: Position, stammdaten: list[dict], threshold: int) -> MatchResult | None:
+    # Weighted: description dominates, material is a tie-breaker.
     best_idx = -1
     best_score = 0.0
     for i, row in enumerate(stammdaten):
         bez_score = fuzz.token_set_ratio(pos.bezeichnung or "", row.get("bezeichnung", ""))
-        mat_score = 0.0
-        if pos.werkstoff and row.get("werkstoff"):
-            mat_score = fuzz.token_set_ratio(pos.werkstoff, row["werkstoff"])
-        # Weighted: description dominates, material is a tie-breaker
+        mat_score = (
+            fuzz.token_set_ratio(pos.werkstoff, row["werkstoff"])
+            if pos.werkstoff and row.get("werkstoff")
+            else 0.0
+        )
         combined = 0.75 * bez_score + 0.25 * mat_score
         if combined > best_score:
             best_score = combined
             best_idx = i
 
-    if best_idx >= 0 and best_score >= semantic_threshold:
-        row = stammdaten[best_idx]
-        return MatchResult(
-            pos_nr=pos.pos_nr,
-            status="semantic",
-            score=best_score / 100.0,
-            matched_artikelnr=row["artikel_nr"],
-            matched_bezeichnung=row["bezeichnung"],
-            matched_row=row,
-        )
-
-    return MatchResult(pos_nr=pos.pos_nr, status="no_match", score=0.0)
+    if best_idx < 0 or best_score < threshold:
+        return None
+    row = stammdaten[best_idx]
+    return MatchResult(
+        pos_nr=pos.pos_nr,
+        status="semantic",
+        score=best_score / 100.0,
+        matched_artikelnr=row["artikel_nr"],
+        matched_bezeichnung=row["bezeichnung"],
+        matched_row=row,
+    )
 
 
 def _normalize(s: str) -> str:

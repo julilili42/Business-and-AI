@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { Outlet, useParams, useSearchParams } from "react-router-dom";
 
 import { ErrorState } from "@/shared/components/feedback/ErrorState";
@@ -12,6 +12,43 @@ import { StepIndicator } from "./components/StepIndicator";
 import { useReview } from "./hooks/useReview";
 import { useReviewStatus } from "./hooks/useReviewStatus";
 import { useReviewUiStore } from "./stores/reviewUiStore";
+
+class StepErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[StepErrorBoundary]", error, info.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <PageContainer>
+          <ErrorState
+            title="Fehler beim Rendern des Schritts"
+            error={this.state.error}
+            action={
+              <button
+                className="mt-2 text-xs underline"
+                onClick={() => this.setState({ error: null })}
+              >
+                Erneut versuchen
+              </button>
+            }
+          />
+        </PageContainer>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 /**
  * Review detail layout.
@@ -82,7 +119,11 @@ export function ReviewDetailPage() {
   // Vollbild — only meaningful for the approval step. The step itself
   // is responsible for rendering the focus toolbar.
   if (focusMode) {
-    return <Outlet context={{ detail, focusMode: true }} />;
+    return (
+      <StepErrorBoundary>
+        <Outlet context={{ detail, focusMode: true }} />
+      </StepErrorBoundary>
+    );
   }
 
   if (isPipelineRunning && status.data) {
@@ -108,7 +149,9 @@ export function ReviewDetailPage() {
       <div className="mb-8">
         <StepIndicator />
       </div>
-      <Outlet context={{ detail, focusMode: false }} />
+      <StepErrorBoundary>
+        <Outlet context={{ detail, focusMode: false }} />
+      </StepErrorBoundary>
     </PageContainer>
   );
 }

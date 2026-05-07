@@ -79,7 +79,7 @@ export function ApprovalPanel({
           )}
         </p>
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button
             variant="secondary"
             onClick={() =>
@@ -92,6 +92,45 @@ export function ApprovalPanel({
           >
             Freigabe zurücknehmen
           </Button>
+        </div>
+
+        <div className="mt-5 border-t border-success/20 pt-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Systemintegration
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled
+              title="SAP-Integration — in Vorbereitung"
+              className="flex cursor-not-allowed items-center gap-3.5 rounded-xl border border-border bg-white px-4 py-3 text-left opacity-60 shadow-sm"
+            >
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#003366]">
+                <span className="text-[11px] font-black tracking-widest text-white">SAP</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold leading-tight text-foreground">In SAP anlegen</p>
+                <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">Demnächst verfügbar</p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              disabled
+              title="Salesforce-Integration — in Vorbereitung"
+              className="flex cursor-not-allowed items-center gap-3.5 rounded-xl border border-border bg-white px-4 py-3 text-left opacity-60 shadow-sm"
+            >
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#0176D3]">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 fill-white" aria-hidden="true">
+                  <path d="M10 4a4 4 0 0 1 3.9 3.1A3.5 3.5 0 0 1 17.5 11a3.5 3.5 0 0 1-.5 6.5H7A4 4 0 0 1 7 10a4 4 0 0 1 .4 0A4 4 0 0 1 10 4z"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold leading-tight text-foreground">In Salesforce erstellen</p>
+                <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">Demnächst verfügbar</p>
+              </div>
+            </button>
+          </div>
         </div>
       </section>
     );

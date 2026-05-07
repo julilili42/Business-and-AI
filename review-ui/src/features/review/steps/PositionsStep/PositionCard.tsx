@@ -3,8 +3,8 @@ import { ChevronDown, Replace, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/shared/components/ui/button";
+import { FormField } from "@/shared/components/ui/FormField";
 import { Input } from "@/shared/components/ui/input";
-import { Label } from "@/shared/components/ui/label";
 import { SourceBadge } from "@/shared/components/ui/SourceBadge";
 import { cn } from "@/shared/lib/cn";
 import type { Evidence, Position } from "@/shared/schemas/anfrage";
@@ -198,23 +198,23 @@ export function PositionCard({
         </div>
 
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
-          <Field label="Artikelnummer">
+          <FormField label="Artikelnummer">
             <Input
               value={draft.artikelnummer}
               onChange={(e) => updateField("artikelnummer", e.target.value)}
               onBlur={() => commit(`positionen[${index}].artikelnummer`)}
             />
-          </Field>
+          </FormField>
 
-          <Field label="Liefertermin">
+          <FormField label="Liefertermin">
             <Input
               value={draft.liefertermin ?? ""}
               onChange={(e) => updateField("liefertermin", e.target.value)}
               onBlur={() => commit(`positionen[${index}].liefertermin`)}
             />
-          </Field>
+          </FormField>
 
-          <Field label="Menge">
+          <FormField label="Menge">
             <Input
               type="number"
               step="any"
@@ -222,33 +222,33 @@ export function PositionCard({
               onChange={(e) => updateField("menge", Number(e.target.value))}
               onBlur={() => commit(`positionen[${index}].menge`)}
             />
-          </Field>
+          </FormField>
 
-          <Field label="Werkstoff">
+          <FormField label="Werkstoff">
             <Input
               value={draft.werkstoff ?? ""}
               onChange={(e) => updateField("werkstoff", e.target.value)}
               onBlur={() => commit(`positionen[${index}].werkstoff`)}
             />
-          </Field>
+          </FormField>
 
-          <Field label="Einheit">
+          <FormField label="Einheit">
             <Input
               value={draft.einheit}
               onChange={(e) => updateField("einheit", e.target.value)}
               onBlur={() => commit(`positionen[${index}].einheit`)}
             />
-          </Field>
+          </FormField>
 
-          <Field label="Zeichnungs-Nr.">
+          <FormField label="Zeichnungs-Nr.">
             <Input
               value={draft.zeichnungsnummer ?? ""}
               onChange={(e) => updateField("zeichnungsnummer", e.target.value)}
               onBlur={() => commit(`positionen[${index}].zeichnungsnummer`)}
             />
-          </Field>
+          </FormField>
 
-          <Field label="Stückpreis EUR" hint="Manueller Preis-Override">
+          <FormField label="Stückpreis EUR" hint="Manueller Preis-Override">
             <Input
               type="number"
               step="0.01"
@@ -256,46 +256,46 @@ export function PositionCard({
               onChange={(e) => setUnitPriceDraft(Number(e.target.value))}
               onBlur={commitUnitPrice}
             />
-          </Field>
+          </FormField>
 
-          <Field label="Abmessungen">
+          <FormField label="Abmessungen">
             <Input
               value={draft.abmessungen ?? ""}
               onChange={(e) => updateField("abmessungen", e.target.value)}
               onBlur={() => commit(`positionen[${index}].abmessungen`)}
             />
-          </Field>
+          </FormField>
         </div>
 
         <div className="mt-3">
-          <Field label="Bezeichnung">
+          <FormField label="Bezeichnung">
             <textarea
               className="flex min-h-[72px] w-full rounded-md border border-input bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={draft.bezeichnung}
               onChange={(e) => updateField("bezeichnung", e.target.value)}
               onBlur={() => commit(`positionen[${index}].bezeichnung`)}
             />
-          </Field>
+          </FormField>
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
-          <Field label="Lieferzeit">
+          <FormField label="Lieferzeit">
             <Input
               value={draft.lieferzeit ?? ""}
               onChange={(e) => updateField("lieferzeit", e.target.value)}
               onBlur={() => commit(`positionen[${index}].lieferzeit`)}
               placeholder="z. B. 6 Wochen"
             />
-          </Field>
+          </FormField>
 
-          <Field label="Lieferwerk">
+          <FormField label="Lieferwerk">
             <Input
               value={draft.lieferwerk ?? ""}
               onChange={(e) => updateField("lieferwerk", e.target.value)}
               onBlur={() => commit(`positionen[${index}].lieferwerk`)}
               placeholder="z. B. Werk Dettingen"
             />
-          </Field>
+          </FormField>
         </div>
 
         <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm">
@@ -335,24 +335,3 @@ export function PositionCard({
   );
 }
 
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs">
-        {label}
-        {hint && (
-          <span className="ml-1 font-normal text-muted-foreground">· {hint}</span>
-        )}
-      </Label>
-      {children}
-    </div>
-  );
-}

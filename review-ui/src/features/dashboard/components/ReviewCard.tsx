@@ -11,16 +11,10 @@ import {
   type ReviewSummary,
 } from "../schemas/reviewSummary";
 
-const STATUS_TONE: Record<ReviewStatus, "success" | "info" | "warning"> = {
-  abgeschlossen: "success",
-  pdf_bereit: "info",
-  in_arbeit: "warning",
-};
-
-const STATUS_LABEL: Record<ReviewStatus, string> = {
-  abgeschlossen: "Abgeschlossen",
-  pdf_bereit: "PDF bereit",
-  in_arbeit: "In Arbeit",
+const STATUS_CONFIG: Record<ReviewStatus, { tone: "success" | "info" | "warning"; label: string }> = {
+  abgeschlossen: { tone: "success", label: "Abgeschlossen" },
+  pdf_bereit:    { tone: "info",    label: "PDF bereit" },
+  in_arbeit:     { tone: "warning", label: "In Arbeit" },
 };
 
 interface ReviewCardProps {
@@ -41,8 +35,8 @@ export function ReviewCard({ review }: ReviewCardProps) {
 
       <div className="min-w-0">
         <div className="mb-1 flex flex-wrap items-center gap-2">
-          <Pill tone={STATUS_TONE[review.status]} withDot>
-            {STATUS_LABEL[review.status]}
+          <Pill tone={STATUS_CONFIG[review.status].tone} withDot>
+            {STATUS_CONFIG[review.status].label}
           </Pill>
           {review.matches_no_match > 0 && review.status !== "abgeschlossen" && (
             <Pill tone="danger" withDot>
