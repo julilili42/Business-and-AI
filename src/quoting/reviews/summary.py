@@ -14,12 +14,15 @@ Status detection
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
 from quoting.reviews import find_draft_pdf, read_json
+
+log = logging.getLogger(__name__)
 
 
 ReviewStatus = Literal["abgeschlossen", "pdf_bereit", "in_arbeit"]
@@ -83,7 +86,8 @@ def scan_reviews(reviews_root: Path) -> list[ReviewSummary]:
             continue
         try:
             summaries.append(_summarize(entry))
-        except Exception:
+        except Exception as exc:
+            log.warning("Skipping malformed review folder %s: %s", entry.name, exc)
             continue
 
     summaries.sort(key=lambda s: s.updated_at, reverse=True)

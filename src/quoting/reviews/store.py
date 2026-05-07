@@ -28,7 +28,7 @@ def read_json(path: Path) -> Any:
         return None
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, OSError, ValueError):
         return None
 
 
@@ -37,8 +37,12 @@ def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(_to_jsonable(value), indent=2, ensure_ascii=False)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(payload, encoding="utf-8")
-    tmp.replace(path)
+    try:
+        tmp.write_text(payload, encoding="utf-8")
+        tmp.replace(path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 # --------------------------------------------------------------- review-aware
@@ -71,8 +75,13 @@ def load_review_state(review_dir: Path) -> dict | None:
 
 
 # ------------------------------------------------------------------ internal
-def _to_jsonable(value: Any) -> Any:
+_MAX_JSONABLE_DEPTH = 50
+
+
+def _to_jsonable(value: Any, _depth: int = 0) -> Any:
     """Best-effort conversion of common types into JSON-ready primitives."""
+    if _depth > _MAX_JSONABLE_DEPTH:
+        raise ValueError(f"_to_jsonable exceeded max depth ({_MAX_JSONABLE_DEPTH}): possible circular reference")
     if hasattr(value, "model_dump"):
         return value.model_dump(mode="json")
     if hasattr(value, "to_dict"):
@@ -80,7 +89,7 @@ def _to_jsonable(value: Any) -> Any:
     if is_dataclass(value):
         return asdict(value)
     if isinstance(value, list):
-        return [_to_jsonable(item) for item in value]
+        return [_to_jsonable(item, _depth + 1) for item in value]
     if isinstance(value, dict):
-        return {key: _to_jsonable(item) for key, item in value.items()}
+        return {key: _to_jsonable(item, _depth + 1) for key, item in value.items()}
     return value

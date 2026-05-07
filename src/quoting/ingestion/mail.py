@@ -61,6 +61,20 @@ def mail_from_file(path: Path) -> Mail:
 # ---------- internals ----------
 
 
+def _unique_path(directory: Path, filename: str) -> Path:
+    """Return a path inside directory that does not collide with existing files."""
+    target = directory / filename
+    if not target.exists():
+        return target
+    stem = Path(filename).stem
+    suffix = Path(filename).suffix
+    counter = 1
+    while target.exists():
+        target = directory / f"{stem}_{counter}{suffix}"
+        counter += 1
+    return target
+
+
 def _parse_eml(eml_path: Path, temp_dir: Path | None = None) -> Mail:
     target_dir = temp_dir or Path(tempfile.mkdtemp(prefix="eml_att_"))
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -87,7 +101,7 @@ def _parse_eml(eml_path: Path, temp_dir: Path | None = None) -> Mail:
         if not filename:
             continue
         safe_name = Path(filename).name
-        target = target_dir / safe_name
+        target = _unique_path(target_dir, safe_name)
         payload = part.get_payload(decode=True)
         if payload:
             target.write_bytes(payload)
@@ -121,7 +135,7 @@ def _parse_msg(msg_path: Path, temp_dir: Path | None = None) -> Mail:
                 continue
             filename = att.longFilename or att.shortFilename or "attachment"
             safe_name = Path(filename).name
-            target = target_dir / safe_name
+            target = _unique_path(target_dir, safe_name)
             target.write_bytes(att.data)
             attachments.append(target)
 
@@ -149,5 +163,5 @@ def _html_to_text(html: str) -> str:
         stripper = _TextStripper()
         stripper.feed(html)
         return "\n".join(p.strip() for p in stripper.parts if p.strip())
-    except Exception:
+    except (AttributeError, TypeError):
         return html

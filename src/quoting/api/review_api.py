@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
 import shutil
+import traceback
 import uuid
 from pathlib import Path
+from typing import cast
+
+log = logging.getLogger(__name__)
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +18,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from quoting.api.approval_store import (
+    ApprovalState,
     VALID_TRANSITIONS,
     load_approval,
     reset_approval,
@@ -172,7 +178,7 @@ def post_approval(review_id: str, payload: ApprovalTransitionRequest):
         raise HTTPException(400, f"Unknown target state: {payload.target}")
     record = transition(
         folder,
-        target=payload.target,  # type: ignore[arg-type]
+        target=cast(ApprovalState, payload.target),
         actor=payload.actor,
         changed_fields=payload.changed_fields,
         warning_acknowledged=payload.warning_acknowledged,
@@ -376,6 +382,7 @@ def _run_review_pipeline(
         response["summary"] = result.summary()
         complete_progress(folder, response)
     except Exception as exc:
+        log.error("Pipeline failed for review %s: %s\n%s", folder.name, exc, traceback.format_exc())
         fail_progress(folder, str(exc))
 
 

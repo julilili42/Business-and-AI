@@ -22,7 +22,11 @@ export function loadPendingReview(): PendingReview | null {
 }
 
 export function savePendingReview(pendingReview: PendingReview): void {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingReview));
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingReview));
+  } catch {
+    /* Quota exceeded or storage disabled — workflow still works in-memory. */
+  }
 }
 
 export function clearPendingReview(): void {

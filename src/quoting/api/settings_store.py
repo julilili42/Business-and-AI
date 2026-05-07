@@ -97,7 +97,7 @@ def load_user_settings() -> AppSettings:
     try:
         raw = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
         return AppSettings.from_dict(raw)
-    except Exception:
+    except (json.JSONDecodeError, OSError, ValueError):
         return AppSettings()
 
 
@@ -105,11 +105,15 @@ def save_user_settings(settings: AppSettings) -> None:
     """Atomically persist user settings."""
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = SETTINGS_PATH.with_suffix(".tmp")
-    tmp.write_text(
-        json.dumps(settings.to_dict(), indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    tmp.replace(SETTINGS_PATH)
+    try:
+        tmp.write_text(
+            json.dumps(settings.to_dict(), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        tmp.replace(SETTINGS_PATH)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 # Back-compat aliases. Prefer the explicit names above in new code.

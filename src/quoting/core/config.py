@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from dotenv import load_dotenv
 
@@ -46,7 +46,7 @@ class Settings:
     # Paths
     project_root: Path = field(default_factory=lambda: _PROJECT_ROOT)
     data_dir: Path = field(default_factory=lambda: _PROJECT_ROOT / "data")
-    output_dir: Path = field(default_factory=lambda: Path(r"C:\Business & AI\Output"))
+    output_dir: Path = field(default_factory=lambda: _PROJECT_ROOT / "output")
 
     # Matching
     fuzzy_threshold: int = 85
@@ -97,7 +97,7 @@ def load_runtime_settings() -> Settings:
 
     base = Settings()
     return Settings(
-        llm_provider=provider,  # type: ignore[arg-type]
+        llm_provider=cast(Provider, provider),
         llm_max_retries=_int("LLM_MAX_RETRIES", 3),
         llm_timeout_s=_int("LLM_TIMEOUT_S", 120),
         google_api_key=os.getenv("GOOGLE_API_KEY"),

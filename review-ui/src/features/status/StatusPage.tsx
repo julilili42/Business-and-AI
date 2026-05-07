@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ErrorState } from "@/shared/components/feedback/ErrorState";
 import { LoadingState } from "@/shared/components/feedback/LoadingState";
 import { PageContainer } from "@/shared/components/layout/PageContainer";
+import { MINUTES_PER_MANUAL_REVIEW } from "@/shared/lib/constants";
 import { useMetrics } from "./hooks/useMetrics";
 import type { Metrics, PerReviewMetric } from "./schemas/metrics";
 
@@ -16,8 +17,6 @@ function fmtEur(n: number): string {
 function fmtPct(n: number): string {
   return (n * 100).toFixed(1) + " %";
 }
-
-const MINUTES_PER_MANUAL_REVIEW = 15;
 
 function StatCell({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (

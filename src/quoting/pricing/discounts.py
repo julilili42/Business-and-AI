@@ -11,6 +11,8 @@ _VOLUME_TIERS: list[tuple[float, float]] = [
 
 def volume_discount(qty: float) -> float:
     """Return discount fraction (0.10 = 10%) based on quantity tiers."""
+    if qty < 0:
+        raise ValueError(f"Quantity must be non-negative, got {qty}")
     for threshold, discount in _VOLUME_TIERS:
         if qty >= threshold:
             return discount

@@ -6,9 +6,32 @@ import { ResetReviewAction } from "./ResetReviewAction";
 interface ReviewHeroProps {
   reviewId: string;
   fileName?: string;
+  createdAt?: string | null;
 }
 
-export function ReviewHero({ reviewId, fileName }: ReviewHeroProps) {
+function SlaIndicator({ createdAt }: { createdAt: string }) {
+  const elapsedMs = Date.now() - new Date(createdAt).getTime();
+  const elapsedHours = elapsedMs / (1000 * 60 * 60);
+  const label =
+    elapsedHours < 1
+      ? `${Math.round(elapsedHours * 60)} Min.`
+      : `${elapsedHours.toFixed(1).replace(".", ",")} Std.`;
+
+  const tone =
+    elapsedHours < 1
+      ? "text-green-600"
+      : elapsedHours < 4
+        ? "text-yellow-600"
+        : "text-red-600";
+
+  return (
+    <span className={`text-sm font-medium ${tone}`} title="Reaktionszeit seit Eingang">
+      ⏱ {label}
+    </span>
+  );
+}
+
+export function ReviewHero({ reviewId, fileName, createdAt }: ReviewHeroProps) {
   // Heuristic: anything not coming via the Outlook flow lacks
   // a real review-id format with the 12-hex-char convention.
   // For now we just check length; tighten later if the heuristic
@@ -35,6 +58,7 @@ export function ReviewHero({ reviewId, fileName }: ReviewHeroProps) {
               <code className="ml-1 font-mono text-[11px]">{reviewId}</code>
             </Pill>
             {fileName && <Pill tone="neutral">{fileName}</Pill>}
+            {createdAt && <SlaIndicator createdAt={createdAt} />}
           </div>
         </div>
 

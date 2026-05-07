@@ -15,6 +15,9 @@ export const quotationItemSchema = z
     rabatt_prozent: z.number(),
     gesamtpreis: z.number(),
     bemerkung: z.string().default(""),
+    basispreis_eur: z.number().default(0),
+    margin_eur: z.number().default(0),
+    margin_pct: z.number().default(0),
   })
   .passthrough();
 

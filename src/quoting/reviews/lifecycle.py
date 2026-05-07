@@ -15,7 +15,10 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from ..core import get_logger
 from .store import saved_attachment_paths
+
+log = get_logger()
 
 
 _KEEP_FILES: set[str] = {"mail.json"}
@@ -53,8 +56,8 @@ def reset_review_artifacts(review_dir: Path, review_id: str) -> None:
                 entry.unlink()
             elif entry.is_dir():
                 shutil.rmtree(entry)
-        except Exception:
-            # Best-effort cleanup; the next pipeline run will overwrite.
+        except Exception as exc:
+            log.warning("Could not delete %s during reset: %s", entry, exc)
             continue
 
     # Imported lazily so this module stays importable from anywhere.

@@ -88,7 +88,7 @@ export function ReviewDetailPage() {
   if (isPipelineRunning && status.data) {
     return (
       <PageContainer>
-        <ReviewHero reviewId={reviewId} />
+        <ReviewHero reviewId={reviewId} createdAt={detail?.created_at ?? null} />
         <PipelineProgress progress={status.data} />
       </PageContainer>
     );
@@ -96,7 +96,7 @@ export function ReviewDetailPage() {
 
   return (
     <PageContainer wide>
-      <ReviewHero reviewId={reviewId} />
+      <ReviewHero reviewId={reviewId} createdAt={detail.created_at} />
       <div className="mb-8">
         <KpiOverview
           anfrage={detail.anfrage}

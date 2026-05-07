@@ -50,6 +50,8 @@ from quoting.ui.review_agent import apply_manual_overrides
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 REVIEW_DIR = PROJECT_ROOT / "data" / "reviews"
 
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
+
 router = APIRouter(prefix="/api", tags=["frontend"])
 
 _pipeline: QuotingPipeline | None = None
@@ -198,8 +200,11 @@ def get_review_detail(review_id: str) -> dict:
 
     mail_meta = load_mail_meta(folder) or {}
 
+    progress = read_progress(folder) or {}
+
     return {
         "review_id": review_id,
+        "created_at": progress.get("created_at"),
         "anfrage": anfrage.model_dump(mode="json"),
         "matches": [m.to_dict() for m in matches],
         "quotation": quotation.to_dict() if quotation else None,
@@ -551,10 +556,23 @@ def finalize_quotation(review_id: str, payload: FinalizeRequest) -> dict:
 # Upload
 # ============================================================================
 
+_ALLOWED_UPLOAD_TYPES = {"pdf", "xlsx", "csv", "eml", "msg"}
+
+
 @router.post("/reviews/upload")
 async def upload_review(file: UploadFile = File(...)) -> dict:
     if not file.filename:
         raise HTTPException(400, "Uploaded file is missing a filename")
+
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"File too large: max {MAX_UPLOAD_BYTES // (1024*1024)} MB")
+    await file.seek(0)
+
+    safe_name = Path(file.filename).name
+    file_type = detect_file_type(Path(safe_name))
+    if file_type not in _ALLOWED_UPLOAD_TYPES:
+        raise HTTPException(415, f"Unsupported file type '{file_type}'. Allowed: {', '.join(sorted(_ALLOWED_UPLOAD_TYPES))}")
 
     review_id = uuid.uuid4().hex[:12]
     folder = REVIEW_DIR / review_id
@@ -562,7 +580,6 @@ async def upload_review(file: UploadFile = File(...)) -> dict:
 
     init_progress(folder, review_id)
 
-    safe_name = Path(file.filename).name
     target = folder / safe_name
 
     with target.open("wb") as fh:

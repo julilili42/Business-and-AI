@@ -41,6 +41,8 @@ def with_retry(
     **kwargs,
 ):
     """Exponential backoff for transient LLM failures."""
+    if max_retries < 1:
+        raise ValueError("max_retries must be >= 1")
     last_exc: Exception | None = None
     for attempt in range(1, max_retries + 1):
         try:
@@ -53,5 +55,4 @@ def with_retry(
             log.warning("LLM call failed (attempt %d/%d): %s. Retrying in %.1fs",
                         attempt, max_retries, exc, delay)
             time.sleep(delay)
-    assert last_exc is not None
-    raise last_exc
+    raise last_exc  # type: ignore[misc]  # guaranteed non-None: loop ran >= 1 time

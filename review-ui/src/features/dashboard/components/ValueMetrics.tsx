@@ -1,9 +1,9 @@
+import { MINUTES_PER_MANUAL_REVIEW } from "@/shared/lib/constants";
+
 import {
   matchedCount,
   type ReviewSummary,
 } from "../schemas/reviewSummary";
-
-const MINUTES_PER_MANUAL_REVIEW = 15;
 
 interface ValueMetricsProps {
   reviews: ReviewSummary[];

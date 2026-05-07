@@ -40,13 +40,15 @@ def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
 
 
 def init_progress(review_dir: Path, review_id: str) -> dict[str, Any]:
+    now = _now_iso()
     data: dict[str, Any] = {
         "review_id": review_id,
         "status": "running",
         "current_step": "Mail vorbereiten",
         "current_detail": "Review wird vorbereitet",
         "progress_percent": 0,
-        "updated_at": _now_iso(),
+        "created_at": now,
+        "updated_at": now,
         "steps": [
             {
                 "name": step_name,
@@ -70,7 +72,7 @@ def read_progress(review_dir: Path) -> dict[str, Any] | None:
 
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         return None
 
 

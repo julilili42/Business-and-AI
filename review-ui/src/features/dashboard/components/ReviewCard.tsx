@@ -47,7 +47,7 @@ export function ReviewCard({ review }: ReviewCardProps) {
           {review.matches_no_match > 0 && review.status !== "abgeschlossen" && (
             <Pill tone="danger" withDot>
               {review.matches_no_match}{" "}
-              {review.matches_no_match === 1 ? "offen" : "offen"}
+              {review.matches_no_match === 1 ? "Position offen" : "Positionen offen"}
             </Pill>
           )}
           <code className="rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-[10.5px] text-muted-foreground">

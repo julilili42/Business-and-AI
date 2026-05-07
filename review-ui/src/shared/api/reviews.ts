@@ -46,6 +46,7 @@ const mailMetaSchema = z.object({
 
 export interface ReviewDetail {
   review_id: string;
+  created_at: string | null;
   anfrage: Anfrage;
   matches: MatchResult[];
   quotation: Quotation | null;
@@ -57,6 +58,7 @@ export interface ReviewDetail {
 
 const reviewDetailSchema = z.object({
   review_id: z.string(),
+  created_at: z.string().nullable().default(null),
   anfrage: anfrageSchema,
   matches: z.array(matchResultSchema),
   quotation: quotationSchema.nullable(),

@@ -28,6 +28,9 @@ class QuotationItem:
     rabatt_prozent: float
     gesamtpreis: float
     bemerkung: str
+    basispreis_eur: float = 0.0
+    margin_eur: float = 0.0
+    margin_pct: float = 0.0
 
 
 @dataclass
@@ -108,12 +111,18 @@ def _build_item(
         einzelpreis = base_price + zkalk
         rabatt = 0.0
         gesamtpreis = einzelpreis
+        cost = base_price
         if not bemerkung:
             bemerkung = "Certificate - flat surcharge"
     else:
         rabatt = volume_discount(pos.menge)
         einzelpreis = base_price * (1 - rabatt) + zkalk
         gesamtpreis = einzelpreis * pos.menge
+        cost = base_price * pos.menge
+
+    gesamtpreis_r = round(gesamtpreis, 2)
+    margin_eur = round(gesamtpreis_r - cost, 2)
+    margin_pct = round(margin_eur / gesamtpreis_r * 100, 1) if gesamtpreis_r > 0 else 0.0
 
     return (
         QuotationItem(
@@ -124,8 +133,11 @@ def _build_item(
             einheit=pos.einheit,
             einzelpreis=round(einzelpreis, 2),
             rabatt_prozent=round(rabatt * 100, 1),
-            gesamtpreis=round(gesamtpreis, 2),
+            gesamtpreis=gesamtpreis_r,
             bemerkung=bemerkung,
+            basispreis_eur=round(base_price, 2),
+            margin_eur=margin_eur,
+            margin_pct=margin_pct,
         ),
         warnings,
     )
