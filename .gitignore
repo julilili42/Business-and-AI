@@ -20,6 +20,7 @@ build/
 dist/
 *.egg-info/
 .eggs/
+node_modules/
 
 # =========================
 # Logs & Cache
@@ -92,3 +93,5 @@ data/reviews/
 # Claude
 .claude
 Claude.md
+
+.ruff_cache
