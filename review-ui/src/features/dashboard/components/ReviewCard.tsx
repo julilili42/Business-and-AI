@@ -1,20 +1,19 @@
-import { ArrowUpRight, FileDown } from "lucide-react";
+import { AlertCircle, ArrowUpRight, FileDown } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { Pill } from "@/shared/components/ui/pill";
+import { cn } from "@/shared/lib/cn";
 import { formatDate, formatEur } from "@/shared/lib/format";
 import { pdfUrl } from "@/shared/lib/pdfUrl";
 
-import {
-  matchRate,
-  type ReviewStatus,
-  type ReviewSummary,
-} from "../schemas/reviewSummary";
+import { matchRate, type ReviewStatus, type ReviewSummary } from "../schemas/reviewSummary";
 
-const STATUS_CONFIG: Record<ReviewStatus, { tone: "success" | "info" | "warning"; label: string }> = {
-  abgeschlossen: { tone: "success", label: "Abgeschlossen" },
-  pdf_bereit:    { tone: "info",    label: "PDF bereit" },
-  in_arbeit:     { tone: "warning", label: "In Arbeit" },
+const STATUS_CONFIG: Record<
+  ReviewStatus,
+  { dot: string; text: string; label: string }
+> = {
+  in_arbeit:     { dot: "bg-warning", text: "text-warning", label: "In Arbeit" },
+  pdf_bereit:    { dot: "bg-info",    text: "text-info",    label: "PDF bereit" },
+  abgeschlossen: { dot: "bg-success", text: "text-success", label: "Abgeschlossen" },
 };
 
 interface ReviewCardProps {
@@ -23,82 +22,110 @@ interface ReviewCardProps {
 
 export function ReviewCard({ review }: ReviewCardProps) {
   const detailHref = `/reviews/${encodeURIComponent(review.review_id)}`;
+  const cfg = STATUS_CONFIG[review.status];
   const rate = matchRate(review);
+  const hasOpenPositions = review.matches_no_match > 0 && review.status !== "abgeschlossen";
 
   return (
-    <article className="group relative grid grid-cols-[1fr_auto] items-center gap-4 rounded-lg border border-border bg-surface p-4 shadow-card transition-all hover:border-foreground/30 hover:shadow-card-hover">
-      <Link
-        to={detailHref}
-        className="absolute inset-0 z-0 rounded-lg"
-        aria-label={`Review ${review.review_id} öffnen`}
-      />
-
-      <div className="min-w-0">
-        <div className="mb-1 flex flex-wrap items-center gap-2">
-          <Pill tone={STATUS_CONFIG[review.status].tone} withDot>
-            {STATUS_CONFIG[review.status].label}
-          </Pill>
-          {review.matches_no_match > 0 && review.status !== "abgeschlossen" && (
-            <Pill tone="danger" withDot>
-              {review.matches_no_match}{" "}
-              {review.matches_no_match === 1 ? "Position offen" : "Positionen offen"}
-            </Pill>
-          )}
-          <code className="rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-[10.5px] text-muted-foreground">
-            {review.review_id}
-          </code>
+    <tr className="group border-b border-border last:border-0 transition-colors hover:bg-surface-sunk">
+      {/* Status */}
+      <td className="w-36 px-4 py-4 align-middle">
+        <div className="flex items-center gap-2">
+          <span className={cn("h-2 w-2 shrink-0 rounded-full", cfg.dot)} aria-hidden="true" />
+          <span className={cn("text-xs font-semibold", cfg.text)}>{cfg.label}</span>
         </div>
+      </td>
 
-        <div className="truncate text-sm font-semibold text-foreground">
+      {/* Kunde */}
+      <td className="w-48 px-4 py-4 align-middle">
+        <Link
+          to={detailHref}
+          className="block max-w-[11rem] truncate text-sm font-semibold text-foreground group-hover:text-brand"
+          tabIndex={-1}
+        >
+          {review.sender || "—"}
+        </Link>
+      </td>
+
+      {/* Betreff + ID */}
+      <td className="px-4 py-4 align-middle">
+        <Link
+          to={detailHref}
+          className="block truncate text-sm text-muted-foreground group-hover:text-foreground"
+          tabIndex={-1}
+        >
           {review.subject || "(ohne Betreff)"}
-        </div>
+        </Link>
+        <code className="mt-0.5 block font-mono text-[10px] text-muted-foreground/40">
+          {review.review_id}
+        </code>
+      </td>
 
-        <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
-          <span className="truncate max-w-[16rem]">{review.sender || "—"}</span>
-          <span aria-hidden="true">·</span>
-          <span>{review.positions} Pos</span>
-          <span aria-hidden="true">·</span>
-          <span>Match {Math.round(rate * 100)}%</span>
-          <span aria-hidden="true">·</span>
-          <span>{formatEur(review.total_eur)}</span>
-          {review.manual_overrides_count > 0 && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>
-                {review.manual_overrides_count}{" "}
-                {review.manual_overrides_count === 1 ? "Anpassung" : "Anpassungen"}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="relative z-10 flex flex-col items-end gap-1.5">
-        <span className="whitespace-nowrap text-[11px] font-semibold text-muted-foreground">
+      {/* Datum */}
+      <td className="w-28 px-4 py-4 text-right align-middle">
+        <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
           {formatDate(review.updated_at)}
         </span>
-        {review.has_pdf ? (
-          <a
-            href={pdfUrl(review.review_id, "current", review.updated_at)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-[11.5px] font-bold text-white shadow-sm transition-all hover:-translate-y-px hover:bg-brand-dark"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
-            PDF
-          </a>
-        ) : (
-          <Link
-            to={detailHref}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-[11.5px] font-semibold text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-            Öffnen
-          </Link>
-        )}
-      </div>
-    </article>
+      </td>
+
+      {/* Positionen */}
+      <td className="w-16 px-4 py-4 text-right align-middle">
+        <span className="text-xs tabular-nums text-muted-foreground">{review.positions}</span>
+      </td>
+
+      {/* Match-Quote */}
+      <td className="w-20 px-4 py-4 text-right align-middle">
+        <span
+          className={cn(
+            "text-xs font-semibold tabular-nums",
+            rate >= 0.8 ? "text-success" : rate >= 0.5 ? "text-warning" : "text-brand",
+          )}
+        >
+          {Math.round(rate * 100)}&thinsp;%
+        </span>
+      </td>
+
+      {/* Betrag */}
+      <td className="w-32 px-4 py-4 text-right align-middle">
+        <span className="text-sm font-semibold tabular-nums text-foreground">
+          {formatEur(review.total_eur)}
+        </span>
+      </td>
+
+      {/* Aktion + Warnungen */}
+      <td className="w-28 px-4 py-4 text-right align-middle">
+        <div className="flex items-center justify-end gap-2">
+          {hasOpenPositions && (
+            <span
+              title={`${review.matches_no_match} Position${review.matches_no_match !== 1 ? "en" : ""} ohne Match`}
+              className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand"
+            >
+              <AlertCircle className="h-2.5 w-2.5" aria-hidden="true" />
+              {review.matches_no_match}
+            </span>
+          )}
+          {review.has_pdf ? (
+            <a
+              href={pdfUrl(review.review_id, "current", review.updated_at)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-all hover:-translate-y-px hover:bg-brand-dark"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <FileDown className="h-3 w-3" aria-hidden="true" />
+              PDF
+            </a>
+          ) : (
+            <Link
+              to={detailHref}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+            >
+              <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+              Öffnen
+            </Link>
+          )}
+        </div>
+      </td>
+    </tr>
   );
 }
