@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "@/shared/components/layout/AppShell";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
+import { MailVorlagePage } from "@/features/settings/MailVorlagePage";
 import { StatusPage } from "@/features/status/StatusPage";
 import { StammdatenPage } from "@/features/stammdaten/StammdatenPage";
 import { ReviewDetailPage } from "@/features/review/ReviewDetailPage";
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
       { path: "/stammdaten", element: <StammdatenPage /> },
       { path: "/status", element: <StatusPage /> },
       { path: "/settings", element: <SettingsPage /> },
+      { path: "/mail-vorlage", element: <MailVorlagePage /> },
       {
         path: "/reviews/:reviewId",
         element: <ReviewDetailPage />,

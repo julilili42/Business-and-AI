@@ -172,7 +172,7 @@ export function StatusPage() {
   const { data, isLoading, isError, error } = useMetrics();
 
   if (isLoading) return <LoadingState />;
-  if (isError || !data) return <ErrorState message={String(error)} />;
+  if (isError || !data) return <ErrorState error={error} />;
 
   return (
     <PageContainer>

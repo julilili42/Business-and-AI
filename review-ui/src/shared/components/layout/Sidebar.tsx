@@ -1,11 +1,12 @@
-import { Activity, Database, LayoutDashboard, Settings as SettingsIcon } from "lucide-react";
+import { Activity, Database, LayoutDashboard, Mail, Settings as SettingsIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/shared/lib/cn";
 
-const NAV = [
+const MAIN_NAV = [
   { to: "/", label: "Übersicht", icon: LayoutDashboard, end: true },
   { to: "/stammdaten", label: "Stammdaten", icon: Database, end: false },
   { to: "/status", label: "Status", icon: Activity, end: false },
+  { to: "/mail-vorlage", label: "E-Mail & Dateiname", icon: Mail, end: false },
   { to: "/settings", label: "Einstellungen", icon: SettingsIcon, end: false },
 ] as const;
 
@@ -26,7 +27,7 @@ export function Sidebar({ pageActions }: SidebarProps) {
           </div>
       <nav className="flex-1 space-y-1 px-3">
         <div className="section-label mb-2 px-3">Navigation</div>
-        {NAV.map((item) => {
+        {MAIN_NAV.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
@@ -55,6 +56,7 @@ export function Sidebar({ pageActions }: SidebarProps) {
           {pageActions}
         </div>
       )}
+
     </aside>
   );
 }

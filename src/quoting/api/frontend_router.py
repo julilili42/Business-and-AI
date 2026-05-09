@@ -579,6 +579,7 @@ class FinalizeRequest(BaseModel):
 
 def _sanitize_pdf_filename(name: str) -> str:
     name = re.sub(r'[/\\:*?"<>|]', '_', name.strip())
+    name = name.replace(' ', '_')
     name = re.sub(r'_+', '_', name)
     if not name.lower().endswith('.pdf'):
         name += '.pdf'

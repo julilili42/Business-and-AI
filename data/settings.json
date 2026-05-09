@@ -20,6 +20,6 @@
     "confirm_before_reset": true,
     "final_pdf_filename_template": "Angebot_[Kunde]_[Datum].pdf",
     "email_subject_template": "Angebot zu Ihrer Anfrage: [Betreff]",
-    "email_body_template": "<p>Sehr geehrte Damen und Herren,</p><p>vielen Dank für Ihre Anfrage [Betreff]. Anbei erhalten Sie unser Angebot.</p><p>Mit freundlichen Grüßen<br/>[Absender]</p>"
+    "email_body_template": "Sehr geehrte Damen und Herren,\n\nvielen Dank für Ihre Anfrage [Betreff]. Anbei erhalten Sie unser Angebot.\n\nMit freundlichen Grüßen\n[Absender]"
   }
 }

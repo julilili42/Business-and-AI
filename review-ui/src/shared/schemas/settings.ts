@@ -32,7 +32,7 @@ export const workflowPreferencesSchema = z.object({
   final_pdf_filename_template: z.string().default("Angebot_[Kunde].pdf"),
   email_subject_template: z.string().default("Angebot zu Ihrer Anfrage: [Betreff]"),
   email_body_template: z.string().default(
-    "<p>Sehr geehrte Damen und Herren,</p><p>vielen Dank für Ihre Anfrage. Anbei erhalten Sie unser Angebot.</p><p>Mit freundlichen Grüßen<br/>[Absender]</p>"
+    "Sehr geehrte Damen und Herren,\n\nvielen Dank für Ihre Anfrage. Anbei erhalten Sie unser Angebot.\n\nMit freundlichen Grüßen\n[Absender]"
   ),
 });
 

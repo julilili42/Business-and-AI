@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building2, FileText, Gauge, Mail, Save, Settings2, User } from "lucide-react";
+import { Building2, FileText, Gauge, Save, Settings2, User } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 
@@ -80,7 +80,7 @@ function SettingsForm({ initial, saving, saveSuccess, saveError, onSave }: Setti
   return (
     <form
       className="space-y-5"
-      onSubmit={form.handleSubmit((values) => onSave(values))}
+      onSubmit={form.handleSubmit((values: AppSettings) => onSave(values))}
     >
       {/* Firmendaten */}
       <SettingsCard
@@ -148,33 +148,6 @@ function SettingsForm({ initial, saving, saveSuccess, saveError, onSave }: Setti
         </Grid>
       </SettingsCard>
 
-      {/* E-Mail Vorlage */}
-      <SettingsCard
-        icon={<Mail className="h-4 w-4" />}
-        title="E-Mail Vorlage"
-        description="Betreff und Text der Angebotsmail in Outlook"
-      >
-        <div className="space-y-4">
-          <Field label="Betreff">
-            <Input
-              placeholder="Angebot zu Ihrer Anfrage: [Betreff]"
-              {...form.register("workflow.email_subject_template")}
-            />
-          </Field>
-          <Field label="Nachrichtentext (HTML)">
-            <textarea
-              rows={5}
-              placeholder="<p>Sehr geehrte Damen und Herren,</p>…"
-              className="flex w-full rounded-md border border-input bg-surface px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y min-h-[100px]"
-              {...form.register("workflow.email_body_template")}
-            />
-          </Field>
-          <p className="text-[11px] text-muted-foreground">
-            Platzhalter: <code className="rounded bg-foreground/5 px-1 font-mono">[Betreff]</code> · <code className="rounded bg-foreground/5 px-1 font-mono">[Firma]</code> · <code className="rounded bg-foreground/5 px-1 font-mono">[Absender]</code> · <code className="rounded bg-foreground/5 px-1 font-mono">[Datum]</code>
-          </p>
-        </div>
-      </SettingsCard>
-
       {/* Matching */}
       <SettingsCard
         icon={<Gauge className="h-4 w-4" />}
@@ -216,17 +189,6 @@ function SettingsForm({ initial, saving, saveSuccess, saveError, onSave }: Setti
             checked={form.watch("workflow.confirm_before_reset")}
             onCheckedChange={(v) => form.setValue("workflow.confirm_before_reset", v, { shouldDirty: true })}
           />
-          <div className="py-4">
-            <Field label="Standard-Dateiname finale PDF">
-              <Input
-                placeholder="Angebot_[Kunde].pdf"
-                {...form.register("workflow.final_pdf_filename_template")}
-              />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Platzhalter: <code className="rounded bg-foreground/5 px-1 font-mono">[Kunde]</code> · <code className="rounded bg-foreground/5 px-1 font-mono">[Belegnummer]</code> · <code className="rounded bg-foreground/5 px-1 font-mono">[Kundennummer]</code> · <code className="rounded bg-foreground/5 px-1 font-mono">[Vorgangsnummer]</code> · <code className="rounded bg-foreground/5 px-1 font-mono">[Datum]</code>
-              </p>
-            </Field>
-          </div>
         </div>
       </SettingsCard>
 
@@ -240,7 +202,7 @@ function SettingsForm({ initial, saving, saveSuccess, saveError, onSave }: Setti
             {saveSuccess && !isDirty && (
               <span className="text-xs font-medium text-success">Gespeichert</span>
             )}
-            {saveError && (
+            {saveError != null && (
               <span className="text-xs font-medium text-danger">Speichern fehlgeschlagen</span>
             )}
             <Button variant="primary" type="submit" disabled={saving || !isDirty}>

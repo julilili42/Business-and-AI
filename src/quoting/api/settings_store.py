@@ -61,9 +61,9 @@ class WorkflowPreferences:
     final_pdf_filename_template: str = "Angebot_[Kunde].pdf"
     email_subject_template: str = "Angebot zu Ihrer Anfrage: [Betreff]"
     email_body_template: str = (
-        "<p>Sehr geehrte Damen und Herren,</p>"
-        "<p>vielen Dank für Ihre Anfrage. Anbei erhalten Sie unser Angebot.</p>"
-        "<p>Mit freundlichen Grüßen<br/>[Absender]</p>"
+        "Sehr geehrte Damen und Herren,\n\n"
+        "vielen Dank für Ihre Anfrage. Anbei erhalten Sie unser Angebot.\n\n"
+        "Mit freundlichen Grüßen\n[Absender]"
     )
 
 
