@@ -64,7 +64,6 @@ bilder/
 # Large / Generated Files
 # =========================
 *.pdf
-*.png
 *.jpg
 *.jpeg
 *.tiff
@@ -98,3 +97,4 @@ Claude.md
 
 node_modules/
 rfq_examples/
+outlook-ui/.vite/deps
