@@ -1,13 +1,31 @@
 """Resolve extraction evidence to highlight areas in original PDFs."""
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    import fitz
+
+log = logging.getLogger(__name__)
 
 HighlightStatus = Literal["exact", "candidate", "block", "fuzzy", "page_only", "not_found"]
 TargetKind = Literal["position", "header", "generic"]
+
+# Tuning constants — change here, not in the functions below.
+_MAX_EXACT_QUOTE_LEN    = 180   # quotes longer than this are too noisy for exact search
+_MIN_FUZZY_NEEDLE_LEN   = 8     # very short strings produce too many false positives
+_FUZZY_SCORE_THRESHOLD  = 78    # minimum rapidfuzz partial_ratio to accept a block match
+_MAX_MATCHED_TEXT_LEN   = 160   # truncate matched_text stored in HighlightResult
+_MIN_CANDIDATE_LEN      = 4     # shorter tokens are low-information
+_MAX_CANDIDATE_LEN      = 120   # guards against accidentally passing full sentences
+_LOW_INFO_MAX_LABEL_LEN = 4     # single short alpha labels (e.g. "pos") are noise
+_BLOCK_HIT_TOLERANCE_PX = 2     # pixel tolerance when testing quad centre vs block bbox
+_CANDIDATE_RECT_PADDING = 1.5   # padding added to candidate highlight rect
+_BLOCK_RECT_PADDING     = 2.0   # padding added to containing-block highlight rect
 
 
 @dataclass(frozen=True)
@@ -103,33 +121,28 @@ def resolve_pdf_highlight(
             if fuzzy.areas:
                 return fuzzy
 
-        page_only_index = _page_index_for_page_only(doc.page_count, source_page)
+        page_only_index = _resolve_page_index(doc.page_count, source_page)
         if page_only_index is not None:
             return HighlightResult("page_only", [], pageIndex=page_only_index)
 
     return HighlightResult("not_found", [], message="No matching PDF text found")
 
 
+def _resolve_page_index(page_count: int, source_page: int | None) -> int | None:
+    """Return 0-based page index, or None if source_page is absent/out-of-range."""
+    if source_page is None:
+        return None
+    idx = source_page - 1
+    return idx if 0 <= idx < page_count else None
+
+
 def _page_indices(page_count: int, source_page: int | None) -> list[int]:
-    if source_page is None:
-        return list(range(page_count))
-    page_index = source_page - 1
-    if page_index < 0 or page_index >= page_count:
-        return list(range(page_count))
-    return [page_index]
+    idx = _resolve_page_index(page_count, source_page)
+    return [idx] if idx is not None else list(range(page_count))
 
 
-def _page_index_for_page_only(page_count: int, source_page: int | None) -> int | None:
-    if source_page is None:
-        return None
-    page_index = source_page - 1
-    if page_index < 0 or page_index >= page_count:
-        return None
-    return page_index
-
-
-def _search_exact(doc, page_indices: list[int], quote: str) -> HighlightResult:
-    if len(quote) > 180:
+def _search_exact(doc: fitz.Document, page_indices: list[int], quote: str) -> HighlightResult:
+    if len(quote) > _MAX_EXACT_QUOTE_LEN:
         return HighlightResult("not_found", [])
 
     for page_index in page_indices:
@@ -146,7 +159,7 @@ def _search_exact(doc, page_indices: list[int], quote: str) -> HighlightResult:
 
 
 def _search_candidates(
-    doc,
+    doc: fitz.Document,
     page_indices: list[int],
     candidates: list[str],
     target_kind: TargetKind,
@@ -177,14 +190,15 @@ def _search_candidates(
     return HighlightResult("not_found", [])
 
 
-def _search_fuzzy_blocks(doc, page_indices: list[int], quote: str) -> HighlightResult:
+def _search_fuzzy_blocks(doc: fitz.Document, page_indices: list[int], quote: str) -> HighlightResult:
     try:
         from rapidfuzz import fuzz
-    except Exception:
+    except ImportError:
+        log.debug("rapidfuzz not installed; fuzzy block search skipped")
         return HighlightResult("not_found", [])
 
     needle = _normalise_for_match(quote)
-    if len(needle) < 8:
+    if len(needle) < _MIN_FUZZY_NEEDLE_LEN:
         return HighlightResult("not_found", [])
 
     best: tuple[float, int, object, str] | None = None
@@ -196,17 +210,17 @@ def _search_fuzzy_blocks(doc, page_indices: list[int], quote: str) -> HighlightR
             if best is None or score > best[0]:
                 best = (score, page_index, block, text)
 
-    if best is None or best[0] < 78:
+    if best is None or best[0] < _FUZZY_SCORE_THRESHOLD:
         return HighlightResult("not_found", [])
 
     score, page_index, block, text = best
     page = doc[page_index]
-    rect = _rect_from_tuple(page, block[:4], padding=1.5)
+    rect = _rect_from_tuple(page, block[:4], padding=_CANDIDATE_RECT_PADDING)
     return HighlightResult(
         "fuzzy",
         [_area_from_rect(page, rect, page_index)],
         pageIndex=page_index,
-        matched_text=text[:160],
+        matched_text=text[:_MAX_MATCHED_TEXT_LEN],
         message=f"Fuzzy score {score:.0f}",
     )
 
@@ -226,7 +240,7 @@ def _candidate_values(candidates: list[str], quote: str | None) -> list[str]:
     seen: set[str] = set()
     for value in values:
         cleaned = _clean(value)
-        if not cleaned or len(cleaned) < 4 or len(cleaned) > 120:
+        if not cleaned or len(cleaned) < _MIN_CANDIDATE_LEN or len(cleaned) > _MAX_CANDIDATE_LEN:
             continue
         if _is_low_information_candidate(cleaned):
             continue
@@ -242,31 +256,32 @@ def _is_low_information_candidate(value: str) -> bool:
     label = value.casefold().strip(" .:-")
     if label in _LOW_INFORMATION_CANDIDATES:
         return True
-    return label.isalpha() and len(label) <= 4
+    return label.isalpha() and len(label) <= _LOW_INFO_MAX_LABEL_LEN
 
 
-def _containing_block_rect(page, rect):
+def _containing_block_rect(page: fitz.Page, rect: fitz.Rect) -> fitz.Rect | None:
     cx = (rect.x0 + rect.x1) / 2
     cy = (rect.y0 + rect.y1) / 2
     best = None
     best_area = None
     for block in _text_blocks(page):
         x0, y0, x1, y1 = block[:4]
-        if x0 - 2 <= cx <= x1 + 2 and y0 - 2 <= cy <= y1 + 2:
+        t = _BLOCK_HIT_TOLERANCE_PX
+        if x0 - t <= cx <= x1 + t and y0 - t <= cy <= y1 + t:
             area = (x1 - x0) * (y1 - y0)
             if best is None or area < best_area:
                 best = block
                 best_area = area
     if best is None:
         return None
-    return _rect_from_tuple(page, best[:4], padding=2.0)
+    return _rect_from_tuple(page, best[:4], padding=_BLOCK_RECT_PADDING)
 
 
-def _text_blocks(page):
+def _text_blocks(page: fitz.Page) -> list:
     return [block for block in page.get_text("blocks", sort=True) if len(block) >= 7 and block[6] == 0]
 
 
-def _rect_from_tuple(page, coords, *, padding: float):
+def _rect_from_tuple(page: fitz.Page, coords: tuple, *, padding: float) -> fitz.Rect:
     import fitz
 
     rect = fitz.Rect(*coords)
@@ -277,7 +292,7 @@ def _rect_from_tuple(page, coords, *, padding: float):
     return rect
 
 
-def _area_from_rect(page, rect, page_index: int) -> HighlightArea:
+def _area_from_rect(page: fitz.Page, rect: fitz.Rect, page_index: int) -> HighlightArea:
     page_rect = page.rect
     width = page_rect.width or 1
     height = page_rect.height or 1

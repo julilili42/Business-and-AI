@@ -17,6 +17,15 @@ import type { StammdatenRow } from "@/shared/schemas/stammdaten";
 import { MatchChip } from "./MatchChip";
 import { StammdatenSearchDialog } from "./StammdatenSearchDialog";
 
+function positionsDiffer(a: Position, b: Position): boolean {
+  return (Object.keys(a) as (keyof Position)[]).some((key) => {
+    const av = a[key], bv = b[key];
+    if (Array.isArray(av) && Array.isArray(bv))
+      return av.length !== bv.length || av.some((v, i) => v !== bv[i]);
+    return av !== bv;
+  });
+}
+
 interface PositionCardProps {
   reviewId: string;
   position: Position;
@@ -93,10 +102,9 @@ export function PositionCard({
   };
 
   const commit = (fieldPath: string) => {
-    if (JSON.stringify(draft) !== JSON.stringify(position)) {
-      onFieldEdit(fieldPath);
-      onPositionChange(draft);
-    }
+    if (!positionsDiffer(draft, position)) return;
+    onFieldEdit(fieldPath);
+    onPositionChange(draft);
   };
 
   const handleAssign = (row: StammdatenRow) => {
@@ -171,7 +179,7 @@ export function PositionCard({
           <span className="flex min-w-0 flex-1 items-center gap-2">
             <span
               className={cn(
-                "group relative shrink-0 rounded px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide",
+                "group/confidence relative shrink-0 rounded px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide",
                 position.confidence === "high" && "bg-success/10 text-success",
                 position.confidence === "medium" && "bg-warning/10 text-warning",
                 position.confidence === "low" && "bg-danger/10 text-danger",
@@ -181,7 +189,7 @@ export function PositionCard({
               Pos {position.pos_nr}
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute bottom-full left-0 z-30 mb-1.5 w-72 rounded-md border border-border bg-surface p-2.5 text-xs font-normal normal-case leading-relaxed tracking-normal text-foreground/80 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
+                className="pointer-events-none absolute bottom-full left-0 z-30 mb-1.5 w-72 rounded-md border border-border bg-surface p-2.5 text-xs font-normal normal-case leading-relaxed tracking-normal text-foreground/80 opacity-0 shadow-lg transition-opacity duration-150 group-hover/confidence:opacity-100"
               >
                 {CONFIDENCE_EXPLANATION}
               </span>

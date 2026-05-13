@@ -25,7 +25,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from quoting.api.approval_store import load_approval, transition
 from quoting.api.progress_store import init_progress, read_progress
@@ -543,7 +543,7 @@ def put_anfrage(review_id: str, payload: dict) -> dict:
 
     try:
         anfrage = Anfrage.model_validate(payload)
-    except Exception as exc:
+    except ValidationError as exc:
         raise HTTPException(400, f"Invalid Anfrage payload: {exc}") from exc
 
     write_json(folder / "anfrage_reviewed.json", anfrage.model_dump(mode="json"))

@@ -127,7 +127,7 @@ def _summarize(folder: Path) -> ReviewSummary:
     else:
         status = "in_arbeit"
 
-    created = _safe_mtime(mail and folder / "mail.json") or _safe_mtime(folder)
+    created = _safe_mtime(folder / "mail.json" if mail else folder)
     updated = _safe_mtime(folder)
 
     extracted_articles = [
