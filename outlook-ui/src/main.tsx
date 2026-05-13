@@ -351,11 +351,7 @@ function App() {
             kundenFirma,
           });
           setWorkflow(updated);
-          setStatus(
-            `Freigegeben${
-              record.approved_by ? ` · ${record.approved_by}` : ""
-            }. Angebotsmail bereit.`,
-          );
+          setStatus("Freigegeben. Angebotsmail bereit.");
         }
       } catch {
         /*

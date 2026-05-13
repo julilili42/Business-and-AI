@@ -64,10 +64,10 @@ export function MailVorlagePage() {
   return (
     <PageContainer wide>
       <header className="mb-8">
-        <h1 className="font-display text-4xl font-extrabold tracking-tight md:text-5xl">
+        <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
           E-Mail & Dateiname<span className="text-brand">.</span>
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
           Vorlage für ausgehende Angebotsmail und Name der finalen PDF.
         </p>
       </header>

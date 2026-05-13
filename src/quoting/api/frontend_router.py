@@ -20,8 +20,9 @@ import re
 import shutil
 import uuid
 from datetime import date as _date
+from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
@@ -1014,4 +1015,168 @@ def _file_response_inline(path: Path) -> FileResponse:
         filename=path.name,
         content_disposition_type="inline",
         headers={"Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Debug / health endpoint
+# ---------------------------------------------------------------------------
+
+class CheckResult(BaseModel):
+    name: str
+    status: Literal["ok", "warning", "error"]
+    detail: str
+
+
+class DebugInfo(BaseModel):
+    overall: Literal["ok", "warning", "error"]
+    checks: list[CheckResult]
+    llm_provider: str
+    checked_at: str
+
+
+def _check_llm_key(settings: Any) -> CheckResult:
+    provider = settings.llm_provider
+    if provider == "gemini":
+        key = settings.google_api_key or ""
+        if key:
+            return CheckResult(name="LLM API-Key (Gemini)", status="ok", detail=f"GOOGLE_API_KEY gesetzt ({len(key)} Zeichen)")
+        return CheckResult(name="LLM API-Key (Gemini)", status="error", detail="GOOGLE_API_KEY fehlt oder leer")
+    if provider == "azure":
+        key = settings.nexus_api_key or ""
+        if key:
+            return CheckResult(name="LLM API-Key (Azure)", status="ok", detail=f"NEXUS_API_KEY gesetzt ({len(key)} Zeichen)")
+        return CheckResult(name="LLM API-Key (Azure)", status="error", detail="NEXUS_API_KEY fehlt oder leer")
+    return CheckResult(name="LLM Provider", status="error", detail=f"Unbekannter Provider: {provider!r}")
+
+
+def _check_llm_model(settings: Any) -> CheckResult:
+    if settings.llm_provider == "gemini":
+        model = settings.gemini_model
+        thinking = settings.gemini_thinking_budget
+        hint = f"Thinking-Budget: {thinking}" if thinking != 0 else "Thinking deaktiviert"
+        return CheckResult(name="LLM Modell", status="ok", detail=f"{model} — {hint}")
+    model = settings.azure_model
+    endpoint = settings.azure_endpoint
+    return CheckResult(name="LLM Modell", status="ok", detail=f"{model} @ {endpoint}")
+
+
+def _check_env_file(root: Path) -> CheckResult:
+    env_file = root / ".env"
+    if not env_file.exists():
+        return CheckResult(name=".env Datei", status="error", detail=f"Nicht gefunden: {env_file} — Umgebungsvariablen fehlen möglicherweise")
+    return CheckResult(name=".env Datei", status="ok", detail=str(env_file))
+
+
+def _check_stammdaten(path: Path) -> CheckResult:
+    if not path.exists():
+        return CheckResult(name="stammdaten.csv", status="error", detail=f"Datei nicht gefunden: {path}")
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        rows = max(0, len(lines) - 1)
+        size_kb = round(path.stat().st_size / 1024)
+        return CheckResult(name="stammdaten.csv", status="ok", detail=f"{rows:,} Einträge · {size_kb} KB")
+    except OSError as e:
+        return CheckResult(name="stammdaten.csv", status="error", detail=str(e))
+
+
+def _check_writable_dir(path: Path, label: str) -> CheckResult:
+    if not path.exists():
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            return CheckResult(name=label, status="error", detail=str(e))
+    probe = path / ".write_probe"
+    try:
+        probe.write_text("ok")
+        probe.unlink()
+        return CheckResult(name=label, status="ok", detail=str(path))
+    except OSError as e:
+        return CheckResult(name=label, status="error", detail=f"Nicht beschreibbar: {e}")
+
+
+def _check_review_count(path: Path) -> CheckResult:
+    if not path.exists():
+        return CheckResult(name="Vorhandene Reviews", status="ok", detail="Noch keine Reviews")
+    dirs = [p for p in path.iterdir() if p.is_dir()]
+    return CheckResult(name="Vorhandene Reviews", status="ok", detail=f"{len(dirs)} Review{'s' if len(dirs) != 1 else ''}")
+
+
+def _check_disk_space(path: Path) -> CheckResult:
+    import shutil as _shutil
+    try:
+        usage = _shutil.disk_usage(path)
+        free_mb = usage.free // (1024 * 1024)
+        free_gb = free_mb / 1024
+        detail = f"{free_gb:.1f} GB frei von {usage.total / (1024 ** 3):.1f} GB"
+        if free_mb < 200:
+            return CheckResult(name="Speicherplatz", status="error", detail=f"Kritisch wenig: {detail}")
+        if free_mb < 1024:
+            return CheckResult(name="Speicherplatz", status="warning", detail=f"Wenig Speicher: {detail}")
+        return CheckResult(name="Speicherplatz", status="ok", detail=detail)
+    except OSError as e:
+        return CheckResult(name="Speicherplatz", status="warning", detail=str(e))
+
+
+def _check_thresholds(settings: Any) -> CheckResult:
+    return CheckResult(
+        name="Matching-Schwellenwerte",
+        status="ok",
+        detail=f"Fuzzy: {settings.fuzzy_threshold} · Semantisch: {settings.semantic_threshold} · PDF-DPI: {settings.pdf_render_dpi}",
+    )
+
+
+def _check_settings_file(path: Path) -> CheckResult:
+    if not path.exists():
+        return CheckResult(name="settings.json", status="warning", detail="Noch nicht erstellt — wird beim ersten Speichern angelegt")
+    try:
+        import json
+        json.loads(path.read_text(encoding="utf-8"))
+        return CheckResult(name="settings.json", status="ok", detail=str(path))
+    except Exception as e:
+        return CheckResult(name="settings.json", status="error", detail=f"Parse-Fehler: {e}")
+
+
+def _check_tunnel_url(root: Path) -> CheckResult:
+    tunnel_file = root / ".tunnel_url"
+    if not tunnel_file.exists():
+        return CheckResult(name="Tunnel-URL", status="warning", detail=".tunnel_url fehlt — Outlook Add-in kann Backend möglicherweise nicht erreichen")
+    url = tunnel_file.read_text(encoding="utf-8").strip()
+    return CheckResult(name="Tunnel-URL", status="ok", detail=url or "(leer)")
+
+
+@router.get("/debug", response_model=DebugInfo)
+def get_debug_info() -> DebugInfo:
+    from quoting.core.config import load_settings
+
+    settings = load_settings()
+    data_dir = settings.data_dir
+
+    checks: list[CheckResult] = [
+        _check_env_file(PROJECT_ROOT),
+        _check_llm_key(settings),
+        _check_llm_model(settings),
+        _check_stammdaten(settings.stammdaten_path),
+        _check_writable_dir(data_dir / "reviews", "Reviews-Verzeichnis"),
+        _check_writable_dir(settings.output_dir, "Output-Verzeichnis"),
+        _check_review_count(data_dir / "reviews"),
+        _check_disk_space(data_dir),
+        _check_thresholds(settings),
+        _check_settings_file(data_dir / "settings.json"),
+        _check_tunnel_url(PROJECT_ROOT),
+    ]
+
+    statuses = {c.status for c in checks}
+    if "error" in statuses:
+        overall: Literal["ok", "warning", "error"] = "error"
+    elif "warning" in statuses:
+        overall = "warning"
+    else:
+        overall = "ok"
+
+    return DebugInfo(
+        overall=overall,
+        checks=checks,
+        llm_provider=settings.llm_provider,
+        checked_at=datetime.now().isoformat(timespec="seconds"),
     )

@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import { AppShell } from "@/shared/components/layout/AppShell";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { DebugPage } from "@/features/debug/DebugPage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { MailVorlagePage } from "@/features/settings/MailVorlagePage";
 import { StatusPage } from "@/features/status/StatusPage";
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
       },
       { path: "/stammdaten", element: <StammdatenPage /> },
       { path: "/status", element: <StatusPage /> },
+      { path: "/debug", element: <DebugPage /> },
       { path: "/settings", element: <SettingsPage /> },
       { path: "/mail-vorlage", element: <MailVorlagePage /> },
       {

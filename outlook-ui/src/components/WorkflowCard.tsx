@@ -171,7 +171,6 @@ export function WorkflowCard({
                 <span className="meta-chip-label">Freigabe</span>
                 <span className="meta-value">
                   {formatDate(workflow.approvedAt)}
-                  {workflow.approvedBy ? ` · ${workflow.approvedBy}` : ""}
                 </span>
               </span>
             )}
@@ -339,11 +338,7 @@ export function WorkflowCard({
         {state === "approved" && !workflow?.quoteSentAt && (
           <div className="success-banner">
             <CheckIcon className="btn-icon" />
-            <span>
-              Freigegeben
-              {workflow?.approvedBy ? ` · ${workflow.approvedBy}` : ""}
-              . Angebotsmail bereit.
-            </span>
+            <span>Freigegeben. Angebotsmail bereit.</span>
           </div>
         )}
 

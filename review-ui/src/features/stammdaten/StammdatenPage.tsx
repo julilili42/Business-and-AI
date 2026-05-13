@@ -34,7 +34,7 @@ export function StammdatenPage() {
     <PageContainer>
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-4xl font-extrabold tracking-tight md:text-5xl">
+          <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
             Stammdaten<span className="text-brand">.</span>
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">

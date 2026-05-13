@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building2, FileText, Gauge, Settings2, User } from "lucide-react";
+import { Bug, Building2, ChevronRight, FileText, Gauge, Settings2, User } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 
 import {
@@ -43,7 +44,7 @@ export function SettingsPage() {
   return (
     <PageContainer>
       <header className="mb-8">
-        <h1 className="font-display text-4xl font-extrabold tracking-tight md:text-5xl">
+        <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
           Einstellungen<span className="text-brand">.</span>
         </h1>
       </header>
@@ -191,6 +192,25 @@ function SettingsForm({ initial, saving, saveSuccess, saveError, onSave }: Setti
           />
         </div>
       </SettingsCard>
+
+      <Link to="/debug" className="block">
+        <Card className="cursor-pointer transition-shadow hover:shadow-card-hover">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <Bug className="h-4 w-4" />
+              </span>
+              <div className="flex-1">
+                <CardTitle className="text-sm">System-Diagnose</CardTitle>
+                <CardDescription className="mt-0.5 text-[11px]">
+                  Konfiguration und Systemvoraussetzungen prüfen
+                </CardDescription>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+        </Card>
+      </Link>
 
       <SaveBar isDirty={isDirty} saving={saving} saveSuccess={saveSuccess} saveError={saveError} />
     </form>
