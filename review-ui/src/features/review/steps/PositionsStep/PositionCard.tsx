@@ -144,6 +144,22 @@ export function PositionCard({
     onFieldEdit(`positionen[${index}].artikelnummer`);
   };
 
+  const handleCustomAssign = (row: StammdatenRow) => {
+    const updated: Position = {
+      ...draft,
+      artikelnummer: row.artikel_nr,
+      bezeichnung: row.bezeichnung || draft.bezeichnung,
+      werkstoff: row.werkstoff ?? null,
+      abmessungen: row.abmessungen ?? null,
+      einheit: row.einheit || draft.einheit,
+      confidence: "high",
+    };
+    setDraft(updated);
+    setUnitPriceDraft(row.basispreis_eur);
+    onFieldEdit(`positionen[${index}].artikelnummer`);
+    onFieldEdit(`positionen[${index}].einzelpreis`);
+  };
+
   const initialUnitPrice =
     unitPriceOverride ?? quotationItem?.einzelpreis ?? 0;
   const [unitPriceDraft, setUnitPriceDraft] = useState<number>(initialUnitPrice);
@@ -291,7 +307,14 @@ export function PositionCard({
                   reviewId={reviewId}
                   posNr={position.pos_nr}
                   initialQuery={position.artikelnummer || position.bezeichnung}
+                  initialArticleNumber={position.artikelnummer}
+                  initialDescription={position.bezeichnung}
+                  initialUnit={position.einheit}
+                  initialWerkstoff={position.werkstoff}
+                  initialAbmessungen={position.abmessungen}
+                  initialUnitPrice={unitPriceDraft || initialUnitPrice}
                   onAssign={handleAssign}
+                  onCustomAssign={handleCustomAssign}
                 >
                   <motion.button
                     type="button"

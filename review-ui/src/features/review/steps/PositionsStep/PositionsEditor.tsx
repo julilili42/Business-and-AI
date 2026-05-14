@@ -178,9 +178,11 @@ export function PositionsEditor({
     // Pick the next free pos_nr — max + 1, ensuring uniqueness even
     // after deletes (so we never accidentally collide with the pos_nr
     // of a row the user deleted earlier).
-    const used = new Set(anfrage.positionen.map((p) => p.pos_nr));
-    let nextPosNr = anfrage.positionen.length + 1;
-    while (used.has(nextPosNr)) nextPosNr += 1;
+    const maxPosNr = anfrage.positionen.reduce(
+      (max, position) => Math.max(max, position.pos_nr),
+      0,
+    );
+    const nextPosNr = maxPosNr + 1;
 
     const blank: Position = {
       pos_nr: nextPosNr,

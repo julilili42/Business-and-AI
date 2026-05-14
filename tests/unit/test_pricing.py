@@ -5,7 +5,6 @@ from quoting.core import Anfrage
 from quoting.matching import MatchResult
 from quoting.pricing import build_quotation
 
-
 ROW = {
     "artikel_nr": "001GLP108015",
     "bezeichnung": "Gleitstück PTFE 108x15",
@@ -75,6 +74,32 @@ def test_fuzzy_match_adds_warning(make_position):
     )]
     q = build_quotation(anfrage, matches, Path("/nonexistent.csv"))
     assert any("fuzzy" in w.lower() for w in q.warnungen)
+
+
+def test_custom_article_uses_entered_unit_price_without_volume_discount(make_position):
+    anfrage = Anfrage(positionen=[make_position(menge=500)])
+    matches = [
+        MatchResult(
+            pos_nr=1,
+            status="exact",
+            score=1.0,
+            matched_artikelnr="CUST-001",
+            matched_bezeichnung="Custom Dichtung",
+            matched_row={
+                "artikel_nr": "CUST-001",
+                "bezeichnung": "Custom Dichtung",
+                "basispreis_eur": 12.35,
+                "zkalk_offset_eur": 0.0,
+                "custom": True,
+            },
+        )
+    ]
+
+    q = build_quotation(anfrage, matches, Path("/nonexistent.csv"))
+
+    assert q.items[0].rabatt_prozent == 0.0
+    assert q.items[0].einzelpreis == 12.35
+    assert q.items[0].gesamtpreis == 6175.0
 
 
 def test_total_sums_all_items(make_position, exact_match_factory):

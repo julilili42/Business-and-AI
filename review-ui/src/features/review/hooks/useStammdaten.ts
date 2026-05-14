@@ -1,8 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { stammdatenApi } from "@/shared/api/stammdaten";
+import {
+  stammdatenApi,
+  type CustomArticlePayload,
+} from "@/shared/api/stammdaten";
+import { reviewsApi } from "@/shared/api/reviews";
 
-import { reviewQueryKey } from "@/shared/api/queryKeys";
+import { approvalQueryKey, reviewQueryKey } from "@/shared/api/queryKeys";
 
 /**
  * Live stammdaten search.
@@ -36,6 +40,26 @@ export function useMatchOverride(reviewId: string | undefined) {
     onSuccess: () => {
       if (!reviewId) return;
       queryClient.invalidateQueries({ queryKey: reviewQueryKey(reviewId) });
+    },
+  });
+}
+
+/**
+ * Create a review-local custom article, pin it to a position, and
+ * rebuild the draft quote so pricing/PDF reflect the entered unit price.
+ */
+export function useCustomArticleMatch(reviewId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: CustomArticlePayload) => {
+      if (!reviewId) throw new Error("reviewId is required");
+      await stammdatenApi.createCustomArticle(reviewId, payload);
+      return reviewsApi.regenerate(reviewId);
+    },
+    onSuccess: () => {
+      if (!reviewId) return;
+      queryClient.invalidateQueries({ queryKey: reviewQueryKey(reviewId) });
+      queryClient.invalidateQueries({ queryKey: approvalQueryKey(reviewId) });
     },
   });
 }

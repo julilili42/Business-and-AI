@@ -250,6 +250,7 @@ def get_review_detail(review_id: str) -> dict:
     overrides = read_json(folder / "manual_overrides.json")
     if not isinstance(overrides, list):
         overrides = []
+    overrides = _filter_redundant_custom_price_overrides(overrides, matches)
 
     mail_meta = load_mail_meta(folder) or {}
 
@@ -555,7 +556,10 @@ def put_anfrage(review_id: str, payload: dict) -> dict:
     anfrage = _enrich_exact_article_edits(anfrage, previous, pipeline)
 
     write_json(folder / "anfrage_reviewed.json", anfrage.model_dump(mode="json"))
-    if not (folder / "matches_reviewed.json").exists():
+    if (folder / "matches_reviewed.json").exists():
+        matches = _load_or_recompute_matches(folder, anfrage, pipeline)
+        write_json(folder / "matches_reviewed.json", [m.to_dict() for m in matches])
+    else:
         try:
             matches = match_positions(
                 anfrage.positionen,
@@ -603,6 +607,9 @@ def _load_review_data(
         raise HTTPException(422, f"Matching fehlgeschlagen: {exc}") from exc
 
     overrides = read_json(folder / "manual_overrides.json") or []
+    if not isinstance(overrides, list):
+        overrides = []
+    overrides = _filter_redundant_custom_price_overrides(overrides, matches)
     return anfrage, matches, overrides
 
 
@@ -866,6 +873,16 @@ class ManualMatchRequest(BaseModel):
     artikel_nr: str = Field(min_length=1)
 
 
+class CustomArticleRequest(BaseModel):
+    pos_nr: int = Field(ge=1)
+    artikel_nr: str = Field(min_length=1, max_length=80)
+    bezeichnung: str = Field(min_length=1, max_length=500)
+    einheit: str = Field(default="Stk", min_length=1, max_length=20)
+    unit_price_eur: float = Field(gt=0)
+    werkstoff: str | None = Field(default=None, max_length=200)
+    abmessungen: str | None = Field(default=None, max_length=200)
+
+
 @router.post("/reviews/{review_id}/match-override")
 def override_match(review_id: str, payload: MatchOverrideRequest) -> dict:
     return _set_manual_match(
@@ -886,6 +903,103 @@ def set_manual_match(
         pos_nr=pos_nr,
         artikel_nr=payload.artikel_nr,
     )
+
+
+@router.post("/reviews/{review_id}/custom-article")
+def create_custom_article_match(
+    review_id: str,
+    payload: CustomArticleRequest,
+) -> dict:
+    folder = _review_dir(review_id)
+    pipeline = _get_pipeline()
+
+    artikel_nr = _clean_required_text(payload.artikel_nr, "artikel_nr")
+    bezeichnung = _clean_required_text(payload.bezeichnung, "bezeichnung")
+    einheit = _clean_required_text(payload.einheit, "einheit")
+    werkstoff = _clean_optional_text(payload.werkstoff)
+    abmessungen = _clean_optional_text(payload.abmessungen)
+    unit_price = round(float(payload.unit_price_eur), 2)
+
+    if _find_stammdaten_by_article(pipeline, artikel_nr) is not None:
+        raise HTTPException(
+            409,
+            f"Stammdaten article '{artikel_nr}' already exists",
+        )
+
+    anfrage = _load_or_extract_anfrage(folder, review_id)
+    positions = []
+    position_found = False
+
+    for pos in anfrage.positionen:
+        if pos.pos_nr != payload.pos_nr:
+            positions.append(pos)
+            continue
+
+        positions.append(
+            pos.model_copy(
+                update={
+                    "artikelnummer": artikel_nr,
+                    "bezeichnung": bezeichnung,
+                    "einheit": einheit,
+                    "werkstoff": werkstoff,
+                    "abmessungen": abmessungen,
+                    "confidence": "high",
+                }
+            )
+        )
+        position_found = True
+
+    if not position_found:
+        raise HTTPException(404, f"Position {payload.pos_nr} not found in this review")
+
+    updated_anfrage = anfrage.model_copy(update={"positionen": positions})
+    write_json(folder / "anfrage_reviewed.json", updated_anfrage.model_dump(mode="json"))
+
+    custom_row = {
+        "artikel_nr": artikel_nr,
+        "bezeichnung": bezeichnung,
+        "werkstoff": werkstoff,
+        "abmessungen": abmessungen,
+        "einheit": einheit,
+        "basispreis_eur": unit_price,
+        "zkalk_offset_eur": 0.0,
+        "preis_min_eur": unit_price,
+        "preis_max_eur": unit_price,
+        "sales_group": "Custom",
+        "material_group": "Custom",
+        "n_offers": 0,
+        "source": "custom",
+        "custom": True,
+    }
+
+    matches = _load_or_recompute_matches(folder, updated_anfrage, pipeline)
+    new_match = MatchResult(
+        pos_nr=payload.pos_nr,
+        status="exact",
+        score=1.0,
+        matched_artikelnr=artikel_nr,
+        matched_bezeichnung=bezeichnung,
+        matched_row=custom_row,
+    )
+    updated_matches = _upsert_match(matches, new_match)
+    write_json(folder / "matches_reviewed.json", [m.to_dict() for m in updated_matches])
+
+    overrides = read_json(folder / "manual_overrides.json") or []
+    if not isinstance(overrides, list):
+        overrides = []
+    write_json(
+        folder / "manual_overrides.json",
+        _remove_position_price_overrides(overrides, payload.pos_nr),
+    )
+
+    _invalidate_approval(folder)
+
+    return {
+        "pos_nr": payload.pos_nr,
+        "matched_artikelnr": artikel_nr,
+        "matched_bezeichnung": bezeichnung,
+        "unit_price_eur": unit_price,
+    }
 
 
 def _set_manual_match(review_id: str, pos_nr: int, artikel_nr: str) -> dict:
@@ -921,6 +1035,94 @@ def _set_manual_match(review_id: str, pos_nr: int, artikel_nr: str) -> dict:
         "matched_artikelnr": record.artikel_nr,
         "matched_bezeichnung": record.bezeichnung,
     }
+
+
+def _clean_required_text(value: str, field_name: str) -> str:
+    cleaned = " ".join(str(value or "").split())
+    if not cleaned:
+        raise HTTPException(400, f"{field_name} must not be empty")
+    return cleaned
+
+
+def _clean_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = " ".join(str(value).split())
+    return cleaned or None
+
+
+def _remove_position_price_overrides(
+    overrides: list[dict],
+    pos_nr: int,
+) -> list[dict]:
+    filtered = []
+    for override in overrides:
+        if not isinstance(override, dict):
+            filtered.append(override)
+            continue
+
+        try:
+            override_pos_nr = int(override.get("pos_nr") or 0)
+        except (TypeError, ValueError):
+            filtered.append(override)
+            continue
+
+        if (
+            override.get("target") == "pos"
+            and override_pos_nr == pos_nr
+            and override.get("mode") in {"unit_price_eur", "total_price_eur"}
+        ):
+            continue
+
+        filtered.append(override)
+
+    return filtered
+
+
+def _filter_redundant_custom_price_overrides(
+    overrides: list[dict],
+    matches: list[MatchResult],
+) -> list[dict]:
+    custom_unit_price_by_pos = {}
+    for match in matches:
+        row = match.matched_row or {}
+        if not (row.get("custom") or row.get("source") == "custom"):
+            continue
+        try:
+            custom_unit_price_by_pos[match.pos_nr] = float(row.get("basispreis_eur") or 0)
+        except (TypeError, ValueError):
+            continue
+
+    if not custom_unit_price_by_pos:
+        return overrides
+
+    filtered = []
+    for override in overrides:
+        if not isinstance(override, dict):
+            filtered.append(override)
+            continue
+
+        if (
+            override.get("target") != "pos"
+            or override.get("mode") != "unit_price_eur"
+        ):
+            filtered.append(override)
+            continue
+
+        try:
+            pos_nr = int(override.get("pos_nr") or 0)
+            unit_price = float(override.get("unit_price_eur") or 0)
+        except (TypeError, ValueError):
+            filtered.append(override)
+            continue
+
+        custom_unit_price = custom_unit_price_by_pos.get(pos_nr)
+        if custom_unit_price is not None and abs(unit_price - custom_unit_price) < 0.005:
+            continue
+
+        filtered.append(override)
+
+    return filtered
 
 
 # ============================================================================
@@ -1049,7 +1251,7 @@ def _load_or_recompute_matches(
     )
 
     if isinstance(data, list):
-        return [
+        saved_matches = [
             MatchResult(
                 pos_nr=int(item.get("pos_nr", 0)),
                 status=item.get("status", "no_match"),
@@ -1061,6 +1263,23 @@ def _load_or_recompute_matches(
             for item in data
             if isinstance(item, dict)
         ]
+        active_pos_nrs = {pos.pos_nr for pos in anfrage.positionen}
+        saved_by_pos = {
+            match.pos_nr: match
+            for match in saved_matches
+            if match.pos_nr in active_pos_nrs
+        }
+
+        if len(saved_by_pos) == len(active_pos_nrs):
+            return [saved_by_pos[pos.pos_nr] for pos in anfrage.positionen]
+
+        recomputed = match_positions(
+            anfrage.positionen,
+            pipeline.stammdaten,
+            fuzzy_threshold=pipeline.settings.fuzzy_threshold,
+            semantic_threshold=pipeline.settings.semantic_threshold,
+        )
+        return [saved_by_pos.get(match.pos_nr, match) for match in recomputed]
 
     return match_positions(
         anfrage.positionen,

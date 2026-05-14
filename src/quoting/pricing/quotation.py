@@ -115,9 +115,15 @@ def _build_item(
         warnings.append(f"Pos {pos.pos_nr}: {match.status} match on {artikel_nr}")
 
     base_price, zkalk = _resolve_price(artikel_nr, match, price_overrides)
-    einzelpreis, rabatt, gesamtpreis, cost = _calculate_item_prices(
-        base_price, zkalk, pos.menge, pos.ist_zertifikat
-    )
+    if _is_custom_match(match):
+        einzelpreis, rabatt, gesamtpreis, cost = _calculate_custom_item_prices(
+            base_price,
+            pos.menge,
+        )
+    else:
+        einzelpreis, rabatt, gesamtpreis, cost = _calculate_item_prices(
+            base_price, zkalk, pos.menge, pos.ist_zertifikat
+        )
     if pos.ist_zertifikat and not bemerkung:
         bemerkung = "Certificate - flat surcharge"
 
@@ -157,6 +163,19 @@ def _calculate_item_prices(
     rabatt = volume_discount(menge)
     einzelpreis = base_price * (1 - rabatt) + zkalk
     return einzelpreis, rabatt, einzelpreis * menge, base_price * menge
+
+
+def _calculate_custom_item_prices(
+    unit_price: float,
+    menge: float,
+) -> tuple[float, float, float, float]:
+    """Custom articles use the entered unit price as-is."""
+    return unit_price, 0.0, unit_price * menge, unit_price * menge
+
+
+def _is_custom_match(match: MatchResult) -> bool:
+    row = match.matched_row or {}
+    return bool(row.get("custom") or row.get("source") == "custom")
 
 
 def _resolve_price(
