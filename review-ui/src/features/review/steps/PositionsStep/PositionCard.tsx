@@ -1,8 +1,9 @@
 import * as Accordion from "@radix-ui/react-accordion";
 import { ChevronDown, Replace, Trash2 } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { Fragment, useEffect, useState } from "react";
 
-import { Button } from "@/shared/components/ui/button";
+import { buttonVariants } from "@/shared/components/ui/button";
 import { FormField } from "@/shared/components/ui/FormField";
 import { Input } from "@/shared/components/ui/input";
 import { SourceEyeButton } from "@/shared/components/ui/SourceEyeButton";
@@ -10,7 +11,7 @@ import { cn } from "@/shared/lib/cn";
 import { formatEur } from "@/shared/lib/format";
 import type { Position } from "@/shared/schemas/anfrage";
 import type { SourceNavigationTarget } from "@/shared/types/sourceNavigation";
-import type { MatchResult } from "@/shared/schemas/matchResult";
+import type { MatchResult, MatchStatus } from "@/shared/schemas/matchResult";
 import type { ManualOverride, QuotationItem } from "@/shared/schemas/quotation";
 import type { StammdatenRow } from "@/shared/schemas/stammdaten";
 
@@ -59,7 +60,29 @@ function activeTierIndex(qty: number): number {
 }
 
 const CONFIDENCE_EXPLANATION =
-  "Farbe zeigt die KI-Selbsteinschätzung der Extraktion: grün eindeutig, gelb abgeleitet/teilweise lesbar, rot unklar. Kein objektiver Prüfscore.";
+  "KI-Selbsteinschätzung der Extraktion. Kein objektiver Prüfscore.";
+
+const ARTICLE_BADGE_TONE: Record<MatchStatus | "unknown", string> = {
+  exact: "border-success/20 bg-success-soft text-success",
+  fuzzy: "border-ek-blue/20 bg-ek-blue-soft text-ek-blue",
+  semantic: "border-warning/20 bg-warning-soft text-warning",
+  no_match: "border-brand/20 bg-brand-soft text-brand",
+  unknown: "border-border bg-muted text-foreground",
+};
+
+function displayArticleNumber(position: Position, match?: MatchResult): string {
+  if (match?.status !== "no_match" && match?.matched_artikelnr) {
+    return match.matched_artikelnr;
+  }
+  return position.artikelnummer || "Unbekannt";
+}
+
+function articleBadgeTone(position: Position, match?: MatchResult): string {
+  if (match?.status !== "no_match" && match?.matched_artikelnr) {
+    return ARTICLE_BADGE_TONE[match.status];
+  }
+  return position.artikelnummer ? ARTICLE_BADGE_TONE.no_match : ARTICLE_BADGE_TONE.unknown;
+}
 
 /**
  * Editable position panel.
@@ -139,8 +162,10 @@ export function PositionCard({
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
 
-  const articleNumber = position.artikelnummer || "Unbekannt";
+  const articleNumber = displayArticleNumber(position, match);
+  const articleTone = articleBadgeTone(position, match);
   const quantityMeta = `${Math.round(position.menge)} ${position.einheit}`;
   const sourceEvidence = {
     source_file: position.source_file,
@@ -177,24 +202,23 @@ export function PositionCard({
           )}
         >
           <span className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Pos {position.pos_nr}
+            </span>
+            {position.confidence === "low" && (
+              <span
+                className="shrink-0 rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                title={CONFIDENCE_EXPLANATION}
+              >
+                unsichere Extraktion
+              </span>
+            )}
             <span
               className={cn(
-                "group/confidence relative shrink-0 rounded px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide",
-                position.confidence === "high" && "bg-success/10 text-success",
-                position.confidence === "medium" && "bg-warning/10 text-warning",
-                position.confidence === "low" && "bg-danger/10 text-danger",
+                "max-w-[13rem] shrink-0 truncate rounded-md border px-2 py-1 font-mono text-[13px] font-bold tracking-tight",
+                articleTone,
               )}
-              title={CONFIDENCE_EXPLANATION}
             >
-              Pos {position.pos_nr}
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute bottom-full left-0 z-30 mb-1.5 w-72 rounded-md border border-border bg-surface p-2.5 text-xs font-normal normal-case leading-relaxed tracking-normal text-foreground/80 opacity-0 shadow-lg transition-opacity duration-150 group-hover/confidence:opacity-100"
-              >
-                {CONFIDENCE_EXPLANATION}
-              </span>
-            </span>
-            <span className="max-w-[13rem] shrink-0 truncate rounded-md border border-border bg-muted px-2 py-1 font-mono text-[13px] font-bold tracking-tight text-foreground">
               {articleNumber}
             </span>
             <span className="min-w-0 truncate text-sm font-semibold text-foreground">
@@ -269,16 +293,32 @@ export function PositionCard({
                   initialQuery={position.artikelnummer || position.bezeichnung}
                   onAssign={handleAssign}
                 >
-                  <Button
+                  <motion.button
                     type="button"
-                    size="sm"
-                    variant="ghost"
                     title="Anderen Artikel zuordnen"
-                    className="h-7 border border-border bg-surface px-2 text-xs"
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" }),
+                      "group h-7 border border-border bg-surface px-2 text-xs shadow-none hover:border-ek-blue/30 hover:bg-ek-blue-soft hover:text-ek-blue",
+                    )}
+                    initial={reduceMotion ? false : { opacity: 0, y: -1 }}
+                    animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+                    whileHover={
+                      reduceMotion
+                        ? undefined
+                        : {
+                            y: -0.5,
+                            boxShadow: "0 6px 16px hsl(var(--foreground) / 0.07)",
+                          }
+                    }
+                    whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                   >
-                    <Replace className="h-3.5 w-3.5" aria-hidden="true" />
+                    <Replace
+                      className="h-3.5 w-3.5 transition-transform duration-150 group-hover:-rotate-6"
+                      aria-hidden="true"
+                    />
                     Zuordnen
-                  </Button>
+                  </motion.button>
                 </StammdatenSearchDialog>
               }
             />
@@ -372,7 +412,7 @@ export function PositionCard({
                               "whitespace-nowrap rounded px-2 py-0.5 text-[11px] font-medium transition-all duration-150",
                               discountDisabled
                                 ? "bg-muted text-muted-foreground/40 line-through hover:bg-muted/80"
-                                : "bg-brand text-white hover:bg-brand/80",
+                                : "bg-foreground text-background hover:bg-foreground/85",
                             )}
                           >
                             {t.label}{t.rabatt > 0 && ` –${t.rabatt}%`}
@@ -395,10 +435,10 @@ export function PositionCard({
                     <p className="mt-1.5 text-xs text-muted-foreground">
                       <span className="tabular-nums">{formatEur(basis)}</span>
                       <span className="mx-1.5 text-foreground/30">→</span>
-                      <span className="font-medium text-brand">–{tier.rabatt}% Mengenrabatt</span>
+                      <span className="font-medium text-foreground">–{tier.rabatt}% Mengenrabatt</span>
                       <span className="mx-1.5 text-foreground/30">→</span>
                       <span className="font-semibold text-foreground tabular-nums">{formatEur(basis * (1 - tier.rabatt / 100))}/Stk.</span>
-                      <span className="ml-3 font-medium text-brand tabular-nums">–{formatEur(basis * (tier.rabatt / 100))}/Stk.</span>
+                      <span className="ml-3 font-medium text-muted-foreground tabular-nums">–{formatEur(basis * (tier.rabatt / 100))}/Stk.</span>
                     </p>
                   )}
                 </div>
@@ -419,57 +459,45 @@ export function PositionCard({
           </FormField>
         </div>
 
-        {/* WEITERE DETAILS — divider-style toggle */}
-        <button
-          type="button"
-          onClick={() => setDetailsOpen((o) => !o)}
-          className="flex items-center w-full gap-3 mt-5 text-xs transition-colors text-muted-foreground hover:text-foreground"
-        >
-          <div className="flex-1 h-px bg-border" />
-          <span className="flex items-center gap-1 font-medium shrink-0">
-            <ChevronDown
-              className={cn("h-3 w-3 transition-transform duration-200", detailsOpen && "rotate-180")}
-              aria-hidden="true"
-            />
-            Weitere Details
-          </span>
-          <div className="flex-1 h-px bg-border" />
-        </button>
+        {/* WEITERE DETAILS — divider-style toggle, hidden for certificate positions */}
+        {!draft.ist_zertifikat && (
+          <>
+            <button
+              type="button"
+              onClick={() => setDetailsOpen((o) => !o)}
+              className="flex items-center w-full gap-3 mt-5 text-xs transition-colors text-muted-foreground hover:text-foreground"
+            >
+              <div className="flex-1 h-px bg-border" />
+              <span className="flex items-center gap-1 font-medium shrink-0">
+                <ChevronDown
+                  className={cn("h-3 w-3 transition-transform duration-200", detailsOpen && "rotate-180")}
+                  aria-hidden="true"
+                />
+                Weitere Details
+              </span>
+              <div className="flex-1 h-px bg-border" />
+            </button>
 
-        {detailsOpen && (
-          <div className="grid grid-cols-1 mt-3 gap-x-4 gap-y-3 md:grid-cols-2">
-            <FormField label="Artikelnummer">
-              <Input
-                value={draft.artikelnummer}
-                onChange={(e) => updateField("artikelnummer", e.target.value)}
-                onBlur={() => commit(`positionen[${index}].artikelnummer`)}
-              />
-            </FormField>
+            {detailsOpen && (
+              <div className="grid grid-cols-1 mt-3 gap-x-4 gap-y-3 md:grid-cols-2">
+                <FormField label="Werkstoff">
+                  <Input
+                    value={draft.werkstoff ?? ""}
+                    onChange={(e) => updateField("werkstoff", e.target.value)}
+                    onBlur={() => commit(`positionen[${index}].werkstoff`)}
+                  />
+                </FormField>
 
-            <FormField label="Werkstoff">
-              <Input
-                value={draft.werkstoff ?? ""}
-                onChange={(e) => updateField("werkstoff", e.target.value)}
-                onBlur={() => commit(`positionen[${index}].werkstoff`)}
-              />
-            </FormField>
-
-            <FormField label="Zeichnungs-Nr.">
-              <Input
-                value={draft.zeichnungsnummer ?? ""}
-                onChange={(e) => updateField("zeichnungsnummer", e.target.value)}
-                onBlur={() => commit(`positionen[${index}].zeichnungsnummer`)}
-              />
-            </FormField>
-
-            <FormField label="Abmessungen">
-              <Input
-                value={draft.abmessungen ?? ""}
-                onChange={(e) => updateField("abmessungen", e.target.value)}
-                onBlur={() => commit(`positionen[${index}].abmessungen`)}
-              />
-            </FormField>
-          </div>
+                <FormField label="Abmessungen">
+                  <Input
+                    value={draft.abmessungen ?? ""}
+                    onChange={(e) => updateField("abmessungen", e.target.value)}
+                    onBlur={() => commit(`positionen[${index}].abmessungen`)}
+                  />
+                </FormField>
+              </div>
+            )}
+          </>
         )}
 
         <label className="flex items-center gap-2 mt-4 text-sm cursor-pointer">
@@ -478,6 +506,7 @@ export function PositionCard({
             checked={draft.ist_zertifikat}
             onChange={(e) => {
               const next = { ...draft, ist_zertifikat: e.target.checked };
+              if (e.target.checked) setDetailsOpen(false);
               setDraft(next);
               onFieldEdit(`positionen[${index}].ist_zertifikat`);
               onPositionChange(next);
@@ -500,7 +529,6 @@ function buildPositionSourceCandidates(position: Position): string[] {
     position.artikelnummer,
     String(position.pos_nr),
     position.bezeichnung,
-    position.zeichnungsnummer ?? "",
     position.abmessungen ?? "",
     position.menge ? String(position.menge) : "",
   ].filter((value) => value.trim().length > 0);

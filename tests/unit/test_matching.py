@@ -1,6 +1,6 @@
 """Matcher: exact / fuzzy / composite / no_match."""
 from quoting.matching import match_positions
-from quoting.matching.matcher import _normalize
+from quoting.matching.matcher import _normalize, _normalize_dimension
 
 
 def test_normalize_preserves_digits_and_hyphens():
@@ -10,6 +10,11 @@ def test_normalize_preserves_digits_and_hyphens():
 def test_normalize_empty():
     assert _normalize("") == ""
     assert _normalize(None) == ""  # type: ignore[arg-type]
+
+
+def test_normalize_dimension_removes_units_and_normalizes_separator():
+    assert _normalize_dimension("108 × 15 mm") == "108X15"
+    assert _normalize_dimension("12,5 x 8") == "12.5X8"
 
 
 def test_exact_match_ignores_whitespace_and_case(make_position, sample_stammdaten):
@@ -40,10 +45,39 @@ def test_semantic_match_on_description(make_position, sample_stammdaten):
     positions = [make_position(
         artikelnummer="",
         bezeichnung="Gleitstück aus PTFE 108x15",
+        abmessungen="108 x 15 mm",
     )]
     res = match_positions(positions, sample_stammdaten, semantic_threshold=70)
     assert res[0].status == "semantic"
     assert res[0].matched_artikelnr is not None
+
+
+def test_semantic_match_uses_dimensions_to_disambiguate_variants(make_position):
+    stammdaten = [
+        {
+            "artikel_nr": "A-10815",
+            "bezeichnung": "Gleitstück PTFE",
+            "werkstoff": "PTFE",
+            "abmessungen": "108x15",
+        },
+        {
+            "artikel_nr": "A-08203",
+            "bezeichnung": "Gleitstück PTFE",
+            "werkstoff": "PTFE",
+            "abmessungen": "82x3",
+        },
+    ]
+    positions = [make_position(
+        artikelnummer="",
+        bezeichnung="Gleitstück PTFE",
+        werkstoff="PTFE",
+        abmessungen="82 x 3 mm",
+    )]
+
+    res = match_positions(positions, stammdaten, semantic_threshold=70)
+
+    assert res[0].status == "semantic"
+    assert res[0].matched_artikelnr == "A-08203"
 
 
 def test_preserves_position_order(make_position, sample_stammdaten):

@@ -4,22 +4,22 @@ import { cn } from "@/shared/lib/cn";
 const STATUS_LABEL: Record<MatchStatus, string> = {
   exact: "Exakt",
   fuzzy: "Fuzzy",
-  semantic: "Semantisch",
+  semantic: "Beschreibung",
   no_match: "Kein Treffer",
 };
 
 const STATUS_TONE: Record<MatchStatus, string> = {
   exact: "bg-success-soft text-success",
-  fuzzy: "bg-info-soft text-info",
-  semantic: "bg-info-soft text-info",
-  no_match: "bg-warning-soft text-warning",
+  fuzzy: "bg-ek-blue-soft text-ek-blue",
+  semantic: "bg-warning-soft text-warning",
+  no_match: "bg-brand-soft text-brand",
 };
 
 const STATUS_ACCENT: Record<MatchStatus, string> = {
   exact: "border-l-success",
-  fuzzy: "border-l-info",
-  semantic: "border-l-info",
-  no_match: "border-l-warning",
+  fuzzy: "border-l-ek-blue",
+  semantic: "border-l-warning",
+  no_match: "border-l-brand",
 };
 
 export function MatchChip({
@@ -68,7 +68,6 @@ export function MatchChip({
 
           {showMatchedArticle && (
             <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
-              <span className="text-[10px] font-medium text-muted-foreground">Stamm</span>
               <code className="font-mono text-[11px] font-semibold text-foreground">
                 {match.matched_artikelnr}
               </code>

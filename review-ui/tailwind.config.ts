@@ -39,6 +39,10 @@ const config: Config = {
           dark: "hsl(var(--brand-dark))",
           soft: "hsl(var(--brand-soft))",
         },
+        "ek-blue": {
+          DEFAULT: "hsl(var(--ek-blue))",
+          soft: "hsl(var(--ek-blue-soft))",
+        },
         success: {
           DEFAULT: "hsl(var(--success))",
           soft: "hsl(var(--success-soft))",

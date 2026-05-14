@@ -5,7 +5,6 @@ import { OriginalDocumentViewer } from "@/shared/components/viewers/OriginalDocu
 import type { SourceNavigationTarget } from "@/shared/types/sourceNavigation";
 
 import type { ReviewDetailContext } from "../../ReviewDetailPage";
-import { ChangedFieldsIndicator } from "../../components/ChangedFieldsIndicator";
 import { StepNavigation } from "../../components/StepNavigation";
 import { CustomerForm } from "./CustomerForm";
 
@@ -20,8 +19,6 @@ export function CustomerStep() {
 
   return (
     <>
-      <ChangedFieldsIndicator />
-
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="order-2 lg:order-1">
           <OriginalDocumentViewer

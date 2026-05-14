@@ -7,6 +7,7 @@ import { Label } from "@/shared/components/ui/label";
 import { useReviewUiStore } from "@/features/review/stores/reviewUiStore";
 import type { ApprovalRecord } from "@/shared/schemas/approval";
 import { isApproved } from "@/shared/schemas/approval";
+import { cn } from "@/shared/lib/cn";
 import { formatDate } from "@/shared/lib/format";
 
 import {
@@ -20,11 +21,12 @@ interface ApprovalPanelProps {
   approval: ApprovalRecord | undefined;
   customerName: string;
   /**
-   * Quality-gate verdict. When `false`, the approval button stays
-   * disabled regardless of the actor name. The gate panel above
-   * already explains *why* — we don't repeat that reasoning here.
+   * Open issues from the quality gate. Both blockers and warnings can
+   * be acknowledged and overridden via the same checkbox — the visual
+   * tone escalates when blockers are present so the user notices.
    */
-  gateAllowsApproval: boolean;
+  blockerCount: number;
+  warningCount: number;
 }
 
 function resolveFilenameTemplate(template: string, customerName: string): string {
@@ -39,8 +41,11 @@ export function ApprovalPanel({
   reviewId,
   approval,
   customerName,
-  gateAllowsApproval,
+  blockerCount,
+  warningCount,
 }: ApprovalPanelProps) {
+  const issueCount = blockerCount + warningCount;
+  const hasBlockers = blockerCount > 0;
   const actor = useReviewUiStore((s) => s.approvalActor);
   const setActor = useReviewUiStore((s) => s.setApprovalActor);
   const changedFields = useReviewUiStore((s) => s.changedFields);
@@ -53,10 +58,15 @@ export function ApprovalPanel({
   const defaultFilename = resolveFilenameTemplate(template, customerName);
 
   const [filename, setFilename] = useState(defaultFilename);
+  const [issuesAck, setIssuesAck] = useState(false);
 
   useEffect(() => {
     setFilename(resolveFilenameTemplate(template, customerName));
   }, [template, customerName]);
+
+  useEffect(() => {
+    if (issueCount === 0) setIssuesAck(false);
+  }, [issueCount]);
 
   const approved = isApproved(approval);
 
@@ -140,7 +150,9 @@ export function ApprovalPanel({
     );
   }
 
-  const canApprove = actor.trim().length > 0 && filename.trim().length > 0 && gateAllowsApproval;
+  const issuesHandled = issueCount === 0 || issuesAck;
+  const canApprove =
+    actor.trim().length > 0 && filename.trim().length > 0 && issuesHandled;
 
   return (
     <section className="rounded-lg border border-border bg-surface p-5 shadow-card">
@@ -164,16 +176,44 @@ export function ApprovalPanel({
           />
         </div>
 
+        {issueCount > 0 && (
+          <label
+            className={cn(
+              "flex items-start gap-2 rounded-md border p-3 text-xs",
+              hasBlockers
+                ? "border-danger/40 bg-danger-soft"
+                : "border-warning/30 bg-warning-soft",
+            )}
+          >
+            <input
+              type="checkbox"
+              className={cn(
+                "mt-0.5 h-4 w-4 cursor-pointer",
+                hasBlockers ? "accent-danger" : "accent-warning",
+              )}
+              checked={issuesAck}
+              onChange={(e) => setIssuesAck(e.target.checked)}
+            />
+            <span className="text-foreground">
+              {hasBlockers
+                ? "Trotz offener Punkte freigeben."
+                : "Empfehlungen geprüft und akzeptiert."}
+            </span>
+          </label>
+        )}
+
         <Button
           variant="primary"
           disabled={!canApprove || finalize.isPending}
           title={
-            !gateAllowsApproval
-              ? "Bitte zuerst die offenen Punkte oben klären."
-              : !actor.trim()
-                ? "Bitte Namen eintragen."
-                : !filename.trim()
-                  ? "Bitte Dateinamen eintragen."
+            !actor.trim()
+              ? "Bitte Namen eintragen."
+              : !filename.trim()
+                ? "Bitte Dateinamen eintragen."
+                : !issuesHandled
+                  ? hasBlockers
+                    ? "Bitte Probleme bewusst bestätigen."
+                    : "Bitte Empfehlungen bestätigen."
                   : undefined
           }
           onClick={() =>
@@ -187,7 +227,7 @@ export function ApprovalPanel({
                         target: "approved",
                         actor: actor.trim(),
                         changed_fields: Array.from(changedFields).sort(),
-                        warning_acknowledged: true,
+                        warning_acknowledged: issuesHandled,
                       },
                       {
                         onError: () => {

@@ -8,11 +8,13 @@ import { FormField } from "@/shared/components/ui/FormField";
 import { Input } from "@/shared/components/ui/input";
 import { ShortcutHint } from "@/shared/components/ui/ShortcutHint";
 import { useReviewUiStore } from "@/features/review/stores/reviewUiStore";
+import { useDelayedVisible } from "@/shared/hooks/useDelayedVisible";
 import type { Anfrage, Evidence } from "@/shared/schemas/anfrage";
 import { Button } from "@/shared/components/ui/button";
 import type { SourceNavigationTarget } from "@/shared/types/sourceNavigation";
 
 import { useSaveAndRegenerate } from "../../hooks/useReviewMutations";
+import { ChangedFieldsIndicator } from "../../components/ChangedFieldsIndicator";
 import { customerFormSchema, type CustomerFormValues } from "./schemas";
 
 interface CustomerFormProps {
@@ -33,6 +35,7 @@ interface CustomerFormProps {
 export function CustomerForm({ reviewId, anfrage, onEvidenceSelect }: CustomerFormProps) {
   const trackChange = useReviewUiStore((s) => s.trackChange);
   const saveAndRegenerate = useSaveAndRegenerate(reviewId);
+  const showSaveStatus = useDelayedVisible(saveAndRegenerate.isPending);
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
@@ -87,13 +90,16 @@ export function CustomerForm({ reviewId, anfrage, onEvidenceSelect }: CustomerFo
 
   return (
     <section className="space-y-6">
-      <div>
-        <h2 className="section-label mb-2">Kundendaten prüfen</h2>
-        {saveAndRegenerate.isPending && (
-          <span className="text-xs font-semibold text-info">
-            PDF wird neu berechnet…
-          </span>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="section-label">Kundendaten prüfen</h2>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ChangedFieldsIndicator />
+          {showSaveStatus && (
+            <span className="text-xs font-medium text-muted-foreground" role="status">
+              Änderungen werden gespeichert…
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-surface p-5 shadow-card">

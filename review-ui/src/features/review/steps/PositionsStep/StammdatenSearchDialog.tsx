@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/shared/components/ui/button";
@@ -15,6 +15,7 @@ import { ErrorState } from "@/shared/components/feedback/ErrorState";
 import { LoadingState } from "@/shared/components/feedback/LoadingState";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { formatEur } from "@/shared/lib/format";
+import { cn } from "@/shared/lib/cn";
 import type { StammdatenRow } from "@/shared/schemas/stammdaten";
 
 import {
@@ -49,16 +50,35 @@ export function StammdatenSearchDialog({
 }: StammdatenSearchDialogProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(initialQuery ?? "");
+  const [assigningArticle, setAssigningArticle] = useState<string | null>(null);
   const debouncedQuery = useDebouncedValue(query, 250);
 
   // Reset the query each time the dialog opens so a stale search from
   // the last position doesn't leak in.
   useEffect(() => {
-    if (open) setQuery(initialQuery ?? "");
+    if (open) {
+      setQuery(initialQuery ?? "");
+    } else {
+      setAssigningArticle(null);
+    }
   }, [open, initialQuery]);
 
   const search = useStammdatenSearch(debouncedQuery, open);
   const override = useMatchOverride(reviewId);
+  const assignRow = (row: StammdatenRow) => {
+    if (override.isPending) return;
+    setAssigningArticle(row.artikel_nr);
+    override.mutate(
+      { posNr, artikelNr: row.artikel_nr },
+      {
+        onSuccess: () => {
+          onAssign?.(row);
+          setOpen(false);
+        },
+        onError: () => setAssigningArticle(null),
+      },
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -68,8 +88,7 @@ export function StammdatenSearchDialog({
           <DialogTitle>Position {posNr} · Artikel zuordnen</DialogTitle>
           <DialogDescription>
             Suche nach Artikelnummer oder Bezeichnung. Die ausgewählte
-            Zeile wird als manueller Treffer hinterlegt; das PDF wird
-            anschließend neu berechnet.
+            Zeile wird als manueller Treffer hinterlegt.
           </DialogDescription>
         </DialogHeader>
 
@@ -102,17 +121,8 @@ export function StammdatenSearchDialog({
                   key={row.artikel_nr}
                   row={row}
                   pending={override.isPending}
-                  onPin={() =>
-                    override.mutate(
-                      { posNr, artikelNr: row.artikel_nr },
-                      {
-                        onSuccess: () => {
-                          onAssign?.(row);
-                          setOpen(false);
-                        },
-                      },
-                    )
-                  }
+                  selected={assigningArticle === row.artikel_nr}
+                  onPin={() => assignRow(row)}
                 />
               ))}
             </ul>
@@ -128,14 +138,24 @@ export function StammdatenSearchDialog({
 function ResultRow({
   row,
   pending,
+  selected,
   onPin,
 }: {
   row: StammdatenRow;
   pending: boolean;
+  selected: boolean;
   onPin: () => void;
 }) {
+  const isAssigning = pending && selected;
+
   return (
-    <li className="flex items-center justify-between gap-3 py-2.5">
+    <li
+      className={cn(
+        "flex items-center justify-between gap-3 rounded-md px-2 py-2.5 transition-colors duration-150",
+        selected && "bg-info-soft ring-1 ring-info/20",
+        pending && !selected && "opacity-55",
+      )}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
@@ -154,8 +174,21 @@ function ResultRow({
           </div>
         )}
       </div>
-      <Button variant="primary" size="sm" onClick={onPin} disabled={pending}>
-        {pending ? "Übernehme…" : "Zuordnen"}
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={onPin}
+        disabled={pending}
+        className="min-w-[7.75rem] disabled:opacity-100"
+      >
+        {isAssigning ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            Wird zugeordnet
+          </>
+        ) : (
+          "Zuordnen"
+        )}
       </Button>
     </li>
   );

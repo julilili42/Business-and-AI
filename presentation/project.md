@@ -1,7 +1,5 @@
 **Introduction**
 - Before we begin *Goal of Demo*: Showcase standard workflow for the sales employee
-- Prototype consists of Review Website + Outlook Plugin
-- Start our demo in outlook, and work ourselves towards the review website
 - Most of the inquiries are received by mail => Decided to build a Plugin for easy integration
 
 **Start**
@@ -17,6 +15,32 @@
 
 
 
+
+- Prototype consists of Review Website + Outlook Plugin
+- Start our demo in outlook, and work ourselves towards the review website
+
+
+
+Matching:
+- **Exact Match** on article number
+- **Fuzzy Match** on article number, external library rapidfuzz. 
+  Uses Levenstein Distance to compare strings
+- **Semantic Match**: Activated if no exact and no fuzzy match on article number. Fuzzy matching on name of product and material
+
+
+
+
+
+Certificate Position => No discount
+
+
+
+
+
+Fast Path:
+Uses python package (pyahocorasick)
+
+
 Infrastructure:
 FastAPI Backend, React Review-UI and Outlook Add-in
 
@@ -26,8 +50,8 @@ CSV, Excel -> Markdown
 
 
 Data:
-Grouped Overview_Offers.xlsx File by article number and selected important columns
-
+- Grouped Overview_Offers.xlsx File by article number and selected important columns
+- Base price is calculated as base_price = median(price_per_piece)
 
 LLM:
 - LLM calling with retries (standard 3 times)

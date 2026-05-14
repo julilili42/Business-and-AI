@@ -550,7 +550,24 @@ def put_anfrage(review_id: str, payload: dict) -> dict:
     except ValidationError as exc:
         raise HTTPException(400, f"Invalid Anfrage payload: {exc}") from exc
 
+    pipeline = _get_pipeline()
+    previous = _try_load_anfrage_from_disk(folder)
+    anfrage = _enrich_exact_article_edits(anfrage, previous, pipeline)
+
     write_json(folder / "anfrage_reviewed.json", anfrage.model_dump(mode="json"))
+    if not (folder / "matches_reviewed.json").exists():
+        try:
+            matches = match_positions(
+                anfrage.positionen,
+                pipeline.stammdaten,
+                fuzzy_threshold=pipeline.settings.fuzzy_threshold,
+                semantic_threshold=pipeline.settings.semantic_threshold,
+            )
+        except Exception as exc:
+            log.exception("put_anfrage: match recompute failed for %s", review_id)
+            raise HTTPException(422, f"Matching fehlgeschlagen: {exc}") from exc
+        write_json(folder / "02_matches.json", [m.to_dict() for m in matches])
+
     _invalidate_approval(folder)
 
     return anfrage.model_dump(mode="json")
@@ -792,7 +809,11 @@ def search_stammdaten(
         return []
 
     # Exact artikel_nr match — return immediately without fuzzy scoring
-    exact = next((r for r in records if r.artikel_nr == query), None)
+    normalised_query = _normalise_article_key(query)
+    exact = next(
+        (r for r in records if _normalise_article_key(r.artikel_nr) == normalised_query),
+        None,
+    )
     if exact:
         return [_record_to_hit(exact, score=1.0)]
 
@@ -940,6 +961,69 @@ def _try_load_anfrage_from_disk(folder: Path) -> Anfrage | None:
         if isinstance(data, dict) and data.get("positionen") is not None:
             return Anfrage.model_validate(data)
     return None
+
+
+def _enrich_exact_article_edits(
+    anfrage: Anfrage,
+    previous: Anfrage | None,
+    pipeline: QuotingPipeline,
+) -> Anfrage:
+    """Fill Stammdaten fields when a user changed a position to an exact article.
+
+    This mirrors the manual "Artikel zuordnen" behaviour, but only for
+    article-number edits. Existing descriptions are left alone when the
+    article number did not change so a deliberate text edit is not reverted on
+    the next save.
+    """
+    previous_by_pos = {p.pos_nr: p for p in previous.positionen} if previous else {}
+    next_positions = []
+    changed = False
+
+    for pos in anfrage.positionen:
+        previous_pos = previous_by_pos.get(pos.pos_nr)
+        article_changed = (
+            previous_pos is None
+            or _normalise_article_key(previous_pos.artikelnummer)
+            != _normalise_article_key(pos.artikelnummer)
+        )
+        if not article_changed or not pos.artikelnummer.strip():
+            next_positions.append(pos)
+            continue
+
+        record = _find_stammdaten_by_article(pipeline, pos.artikelnummer)
+        if record is None:
+            next_positions.append(pos)
+            continue
+
+        enriched = pos.model_copy(
+            update={
+                "artikelnummer": record.artikel_nr,
+                "bezeichnung": record.bezeichnung or pos.bezeichnung,
+                "werkstoff": record.werkstoff if record.werkstoff is not None else pos.werkstoff,
+                "abmessungen": record.abmessungen if record.abmessungen is not None else pos.abmessungen,
+                "einheit": record.einheit or pos.einheit,
+            }
+        )
+        next_positions.append(enriched)
+        changed = changed or enriched != pos
+
+    if not changed:
+        return anfrage
+    return anfrage.model_copy(update={"positionen": next_positions})
+
+
+def _find_stammdaten_by_article(pipeline: QuotingPipeline, artikelnummer: str):
+    needle = _normalise_article_key(artikelnummer)
+    if not needle:
+        return None
+    for record in pipeline.stammdaten_repo.all():
+        if _normalise_article_key(record.artikel_nr) == needle:
+            return record
+    return None
+
+
+def _normalise_article_key(value: str | None) -> str:
+    return "".join((value or "").upper().split())
 
 
 def _load_or_extract_anfrage(folder: Path, review_id: str) -> Anfrage:

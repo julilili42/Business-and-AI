@@ -1,28 +1,23 @@
-import { Worker, Viewer, ScrollMode, SpecialZoomLevel } from "@react-pdf-viewer/core";
-import {
-  highlightPlugin,
-  Trigger,
-  type HighlightArea,
-  type RenderHighlightsProps,
-} from "@react-pdf-viewer/highlight";
 import { useQuery } from "@tanstack/react-query";
 import {
   Component,
-  useCallback,
   useEffect,
   useMemo,
+  useRef,
+  useState,
   type ErrorInfo,
   type ReactNode,
 } from "react";
+import { Document, Page, pdfjs } from "react-pdf";
 
-import { reviewsApi } from "@/shared/api/reviews";
+import { reviewsApi, type PdfHighlightArea } from "@/shared/api/reviews";
 import { ErrorState } from "@/shared/components/feedback/ErrorState";
 import { LoadingState } from "@/shared/components/feedback/LoadingState";
 import { cn } from "@/shared/lib/cn";
 import type { SourceNavigationTarget } from "@/shared/types/sourceNavigation";
 
-import "@react-pdf-viewer/core/lib/styles/index.css";
-import "@react-pdf-viewer/highlight/lib/styles/index.css";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
 interface PdfSourcePreviewProps {
   reviewId: string;
@@ -32,8 +27,13 @@ interface PdfSourcePreviewProps {
   className?: string;
 }
 
-const workerUrl = new URL("pdfjs-dist/build/pdf.worker.min.js", import.meta.url).toString();
-const JUMP_TOP_MARGIN_PERCENT = 9;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
+
+const MAX_PAGE_WIDTH = 980;
+const VIEWPORT_PADDING = 32;
 
 class PdfRenderBoundary extends Component<
   { children: ReactNode },
@@ -71,6 +71,11 @@ export function PdfSourcePreview({
   sourceTarget,
   className,
 }: PdfSourcePreviewProps) {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const pageRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [pageWidth, setPageWidth] = useState(760);
+  const [numPages, setNumPages] = useState(0);
+
   const targetKey = useMemo(
     () => (sourceTarget ? JSON.stringify(sourceTarget) : "none"),
     [sourceTarget],
@@ -83,7 +88,7 @@ export function PdfSourcePreview({
     staleTime: 5 * 60_000,
   });
 
-  const highlightAreas = useMemo<HighlightArea[]>(
+  const highlightAreas = useMemo(
     () => highlightQuery.data?.areas ?? [],
     [highlightQuery.data?.areas],
   );
@@ -93,50 +98,37 @@ export function PdfSourcePreview({
     highlightQuery.data?.pageIndex ??
     ((sourceTarget?.evidence.source_page ?? 1) - 1);
 
-  const renderHighlights = useCallback(
-    (props: RenderHighlightsProps) => (
-      <>
-        {highlightAreas
-          .filter((area) => area.pageIndex === props.pageIndex)
-          .map((area, index) => (
-            <div
-              key={`${area.pageIndex}-${area.left}-${area.top}-${index}`}
-              data-testid="pdf-source-highlight"
-              className="rounded-[2px] bg-amber-300/40 ring-1 ring-amber-500/80"
-              style={props.getCssProperties(area, props.rotation)}
-            />
-          ))}
-      </>
-    ),
-    [highlightAreas],
-  );
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
 
-  const highlightPluginInstance = highlightPlugin({
-    trigger: Trigger.None,
-    renderHighlights,
-  });
-  const jumpTargetArea = useMemo<HighlightArea | null>(() => {
-    const firstHighlightArea = highlightAreas[0];
-    if (firstHighlightArea) return withJumpMargin(firstHighlightArea);
-
-    if (highlightQuery.data?.pageIndex == null) return null;
-    return {
-      pageIndex: highlightQuery.data.pageIndex,
-      left: 0,
-      top: 0,
-      width: 1,
-      height: 1,
+    const measure = () => {
+      const nextWidth = Math.min(
+        MAX_PAGE_WIDTH,
+        Math.max(320, viewport.clientWidth - VIEWPORT_PADDING),
+      );
+      setPageWidth(Math.floor(nextWidth));
     };
-  }, [highlightAreas, highlightQuery.data?.pageIndex]);
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
-    if (!jumpTargetArea) return;
+    if (!numPages || !sourceTarget) return;
+
+    const targetPage = Math.max(0, Math.min(numPages - 1, initialPage));
+    const pageElement = pageRefs.current[targetPage];
+    if (!pageElement) return;
 
     const timeout = window.setTimeout(() => {
-      highlightPluginInstance.jumpToHighlightArea(jumpTargetArea);
-    }, 250);
+      pageElement.scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 180);
+
     return () => window.clearTimeout(timeout);
-  }, [highlightPluginInstance, jumpTargetArea]);
+  }, [initialPage, numPages, targetKey]);
 
   return (
     <div className={cn("flex flex-col", className ?? "h-[700px]")}>
@@ -158,36 +150,87 @@ export function PdfSourcePreview({
         </p>
       )}
 
-      <div className="min-h-0 flex-1 overflow-hidden bg-surface">
+      <div
+        ref={viewportRef}
+        className="min-h-0 flex-1 overflow-auto bg-muted/40 px-4 py-4"
+      >
         <PdfRenderBoundary key={fileUrl}>
-          <Worker workerUrl={workerUrl}>
-            <Viewer
-              key={fileUrl}
-              fileUrl={fileUrl}
-              defaultScale={SpecialZoomLevel.PageWidth}
-              initialPage={Math.max(0, initialPage)}
-              plugins={[highlightPluginInstance]}
-              renderError={(error) => (
-                <ErrorState
-                  title="PDF konnte nicht geladen werden"
-                  error={error}
-                  className="m-3"
-                />
-              )}
-              scrollMode={ScrollMode.Vertical}
-            />
-          </Worker>
+          <Document
+            file={fileUrl}
+            loading={<LoadingState label="PDF wird geladen…" />}
+            error={
+              <ErrorState
+                title="PDF konnte nicht geladen werden"
+                error="Die Datei ist nicht verfügbar oder kann vom Browser nicht gelesen werden."
+                className="m-3"
+              />
+            }
+            onLoadSuccess={({ numPages: nextNumPages }) => {
+              setNumPages(nextNumPages);
+              pageRefs.current = Array(nextNumPages).fill(null);
+            }}
+            onLoadError={(error) => {
+              console.error("[PdfSourcePreview] PDF load failed", error);
+            }}
+          >
+            {Array.from({ length: numPages }, (_, index) => (
+              <PdfPage
+                key={`${fileUrl}-${index}`}
+                refCallback={(element) => {
+                  pageRefs.current[index] = element;
+                }}
+                pageNumber={index + 1}
+                width={pageWidth}
+                highlights={highlightAreas.filter((area) => area.pageIndex === index)}
+              />
+            ))}
+          </Document>
         </PdfRenderBoundary>
       </div>
     </div>
   );
 }
 
-function withJumpMargin(area: HighlightArea): HighlightArea {
-  const top = Math.max(0, area.top - JUMP_TOP_MARGIN_PERCENT);
-  return {
-    ...area,
-    top,
-    height: Math.min(100 - top, area.height + (area.top - top)),
-  };
+function PdfPage({
+  pageNumber,
+  width,
+  highlights,
+  refCallback,
+}: {
+  pageNumber: number;
+  width: number;
+  highlights: PdfHighlightArea[];
+  refCallback: (element: HTMLDivElement | null) => void;
+}) {
+  return (
+    <div
+      ref={refCallback}
+      className="relative mx-auto mb-4 w-fit overflow-hidden rounded-md bg-surface shadow-card"
+    >
+      <Page
+        pageNumber={pageNumber}
+        width={width}
+        loading={<LoadingState label={`Seite ${pageNumber} wird geladen…`} />}
+        renderAnnotationLayer
+        renderTextLayer
+      />
+      {highlights.length > 0 && (
+        <div className="pointer-events-none absolute inset-0">
+          {highlights.map((area, index) => (
+            <div
+              key={`${area.pageIndex}-${area.left}-${area.top}-${index}`}
+              data-testid="pdf-source-highlight"
+              className="absolute rounded-[2px] bg-amber-300/40 ring-1 ring-amber-500/80"
+              style={{
+                left: `${area.left}%`,
+                top: `${area.top}%`,
+                width: `${area.width}%`,
+                height: `${area.height}%`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

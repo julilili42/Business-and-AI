@@ -6,6 +6,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { Button } from "@/shared/components/ui/button";
 import { ShortcutHint } from "@/shared/components/ui/ShortcutHint";
 import { useReviewUiStore } from "@/features/review/stores/reviewUiStore";
+import { useDelayedVisible } from "@/shared/hooks/useDelayedVisible";
 import type { Anfrage, Position } from "@/shared/schemas/anfrage";
 import type { SourceNavigationTarget } from "@/shared/types/sourceNavigation";
 import type { MatchResult } from "@/shared/schemas/matchResult";
@@ -66,6 +67,7 @@ export function PositionsEditor({
 }: PositionsEditorProps) {
   const trackChange = useReviewUiStore((s) => s.trackChange);
   const saveAndRegenerate = useSaveAndRegenerate(reviewId);
+  const showSaveStatus = useDelayedVisible(saveAndRegenerate.isPending);
 
   // Track which pos_nrs were just added in this session, so we can
   // auto-expand them and visually distinguish them.
@@ -190,7 +192,6 @@ export function PositionsEditor({
       lieferwerk: null,
       werkstoff: null,
       werkstoff_alternativen: [],
-      zeichnungsnummer: null,
       abmessungen: null,
       gewicht_stueck_kg: null,
       ist_zertifikat: false,
@@ -228,20 +229,22 @@ export function PositionsEditor({
           <h2 id="positions-heading" className="section-label mb-2">
             Positionen prüfen
           </h2>
-          <ChangedFieldsIndicator />
           <MatchSummary matches={activeMatches} />
         </div>
 
-        {saveAndRegenerate.isPending && (
-          <span className="text-xs font-semibold text-info">
-            PDF wird neu berechnet…
-          </span>
-        )}
-        {saveAndRegenerate.isError && (
-          <span className="text-xs font-semibold text-danger">
-            PDF-Neuberechnung fehlgeschlagen — Daten wurden gespeichert. Bitte erneut versuchen.
-          </span>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ChangedFieldsIndicator />
+          {showSaveStatus && (
+            <span className="text-xs font-medium text-muted-foreground" role="status">
+              Änderungen werden gespeichert…
+            </span>
+          )}
+          {saveAndRegenerate.isError && (
+            <span className="text-xs font-semibold text-danger">
+              PDF-Neuberechnung fehlgeschlagen — Daten wurden gespeichert. Bitte erneut versuchen.
+            </span>
+          )}
+        </div>
       </header>
 
       <Accordion.Root

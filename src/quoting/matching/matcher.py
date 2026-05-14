@@ -3,7 +3,7 @@
 Three-tier approach (fully auditable, no LLM):
 1. Exact match on normalized article number
 2. Fuzzy match on article number (typos, OCR errors)
-3. Composite match on description + material (last resort)
+3. Composite match on description + dimensions + material (last resort)
 """
 from __future__ import annotations
 
@@ -102,17 +102,22 @@ def _fuzzy_match(pos: Position, stammdaten: list[dict], threshold: int) -> Match
 
 
 def _composite_match(pos: Position, stammdaten: list[dict], threshold: int) -> MatchResult | None:
-    # Weighted: description dominates, material is a tie-breaker.
+    # Weighted: description dominates; dimensions and material disambiguate variants.
     best_idx = -1
     best_score = 0.0
     for i, row in enumerate(stammdaten):
         bez_score = fuzz.token_set_ratio(pos.bezeichnung or "", row.get("bezeichnung", ""))
+        dim_score = (
+            fuzz.ratio(_normalize_dimension(pos.abmessungen), _normalize_dimension(row["abmessungen"]))
+            if pos.abmessungen and row.get("abmessungen")
+            else 0.0
+        )
         mat_score = (
             fuzz.token_set_ratio(pos.werkstoff, row["werkstoff"])
             if pos.werkstoff and row.get("werkstoff")
             else 0.0
         )
-        combined = 0.75 * bez_score + 0.25 * mat_score
+        combined = 0.60 * bez_score + 0.25 * dim_score + 0.15 * mat_score
         if combined > best_score:
             best_score = combined
             best_idx = i
@@ -133,3 +138,14 @@ def _composite_match(pos: Position, stammdaten: list[dict], threshold: int) -> M
 def _normalize(s: str) -> str:
     """Uppercase, strip all whitespace. Preserves digits/hyphens/dots."""
     return "".join((s or "").upper().split())
+
+
+def _normalize_dimension(value: str | None) -> str:
+    """Normalize dimensions for fuzzy comparison across separators/units."""
+    normalized = _normalize(value or "")
+    return (
+        normalized
+        .replace("×", "X")
+        .replace(",", ".")
+        .replace("MM", "")
+    )

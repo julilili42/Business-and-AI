@@ -14,23 +14,18 @@ import { ApprovalPanel } from "./ApprovalPanel";
 import { ApprovalSummary } from "./ApprovalSummary";
 import { ComparePanes } from "./ComparePanes";
 import { FocusToolbar } from "./FocusToolbar";
-import { QualityGatePanel } from "./QualityGatePanel";
 
 /**
- * Step 3 — Vergleichen, Anpassen, Quality-Check, Freigeben.
+ * Step 3 — Vergleichen, Anpassen, Abschluss-Check, Freigeben.
  *
  * Vertical rhythm:
  *
  *   Compare panes (Original ⇆ Angebot)
- *   AgentChat        — natural-language commercial edits
- *   QualityGatePanel — blockers/warnings + stats
- *   ApprovalPanel    — name input + Freigeben (gated by the panel above)
+ *   ApprovalSummary  — gate + stats + positions table (one card)
+ *   ApprovalPanel    — name input + Freigeben (gated by the summary)
  *
- * The Vollbild variant collapses everything but compare + gate +
- * approval. Hero, KPI strip and step indicator are hidden via the
- * focus mode upstream in ReviewDetailPage. The agent chat is hidden
- * once the review is approved — there's nothing to commercially edit
- * on a finalized angebot.
+ * Hero, KPI strip and step indicator are hidden via the focus mode
+ * upstream in ReviewDetailPage.
  */
 export function ApprovalStep() {
   const { reviewId } = useParams<{ reviewId: string }>();
@@ -64,13 +59,13 @@ export function ApprovalStep() {
           isApproved={approved}
           focusMode
         />
-        {!approved && <QualityGatePanel gate={gate} />}
-        <ApprovalSummary detail={detail} gate={gate} />
+        <ApprovalSummary detail={detail} gate={gate} isApproved={approved} />
         <ApprovalPanel
           reviewId={reviewId}
           approval={approval.data}
           customerName={detail.anfrage.kunde_firma ?? ""}
-          gateAllowsApproval={gate.canApprove}
+          blockerCount={gate.blockers.length}
+          warningCount={gate.warnings.length}
         />
       </div>
     );
@@ -94,15 +89,8 @@ export function ApprovalStep() {
         isApproved={approved}
       />
 
-      {!approved && (
-        <div className="mt-8">
-          <h2 className="section-label mb-3">Qualitätsprüfung</h2>
-          <QualityGatePanel gate={gate} />
-        </div>
-      )}
-
       <div className="mt-8">
-        <ApprovalSummary detail={detail} gate={gate} />
+        <ApprovalSummary detail={detail} gate={gate} isApproved={approved} />
       </div>
 
       <div className="mt-8">
@@ -111,7 +99,8 @@ export function ApprovalStep() {
           reviewId={reviewId}
           approval={approval.data}
           customerName={detail.anfrage.kunde_firma ?? ""}
-          gateAllowsApproval={gate.canApprove}
+          blockerCount={gate.blockers.length}
+          warningCount={gate.warnings.length}
         />
       </div>
 

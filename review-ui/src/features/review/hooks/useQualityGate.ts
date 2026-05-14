@@ -35,19 +35,14 @@ export interface QualityGateResult {
   blockers: Issue[];
   warnings: Issue[];
   canApprove: boolean;
-  /** Compact stat strip: "X von Y Positionen ohne Match" etc. */
   stats: {
     totalPositions: number;
     unmatched: number;
     unmatchedWithoutPriceOverride: number;
-    lowConfidence: number;
     matchRate: number;
   };
 }
 
-/* Tunables — kept here so policy changes are one-line edits. */
-const LOW_MATCH_RATE_THRESHOLD = 0.7;
-const LOW_CONFIDENCE_RATIO_THRESHOLD = 0.3;
 
 export function useQualityGate(detail: ReviewDetail | undefined): QualityGateResult {
   return useMemo(() => evaluate(detail), [detail]);
@@ -59,7 +54,7 @@ function evaluate(detail: ReviewDetail | undefined): QualityGateResult {
       blockers: [],
       warnings: [],
       canApprove: false,
-      stats: { totalPositions: 0, unmatched: 0, unmatchedWithoutPriceOverride: 0, lowConfidence: 0, matchRate: 1 },
+      stats: { totalPositions: 0, unmatched: 0, unmatchedWithoutPriceOverride: 0, matchRate: 1 },
     };
   }
 
@@ -91,10 +86,6 @@ function evaluate(detail: ReviewDetail | undefined): QualityGateResult {
     }
     return true;
   });
-
-  const lowConfidence = (detail?.anfrage.positionen ?? []).filter(
-    (p) => p.confidence === "low",
-  ).length;
 
   const matchedCount = activeMatches.filter((m) => m.status !== "no_match").length;
   const matchRate = totalPositions === 0 ? 1 : matchedCount / totalPositions;
@@ -139,29 +130,6 @@ function evaluate(detail: ReviewDetail | undefined): QualityGateResult {
 
   // ---------- Warnings ----------
 
-  if (totalPositions > 0 && matchRate < LOW_MATCH_RATE_THRESHOLD) {
-    warnings.push({
-      id: "match-rate-low",
-      severity: "warning",
-      step: "positions",
-      title: `Match-Quote nur ${Math.round(matchRate * 100)}%`,
-      description: "",
-    });
-  }
-
-  if (
-    totalPositions > 0 &&
-    lowConfidence / totalPositions > LOW_CONFIDENCE_RATIO_THRESHOLD
-  ) {
-    warnings.push({
-      id: "low-confidence",
-      severity: "warning",
-      step: "positions",
-      title: `${lowConfidence} Position(en) mit geringer KI-Sicherheit`,
-      description: "",
-    });
-  }
-
   if (detail) {
     const a = detail.anfrage;
     if (!(a.belegnummer ?? "").trim()) {
@@ -191,6 +159,38 @@ if (!(a.datum ?? "").trim()) {
         description: "",
       });
     }
+
+    const email = (a.kunde_email ?? "").trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      warnings.push({
+        id: "email-format",
+        severity: "warning",
+        step: "customer",
+        title: "E-Mail-Adresse wirkt unvollständig",
+        description: `"${email}" sieht nicht wie eine gültige Adresse aus.`,
+      });
+    }
+  }
+
+  const priceWarningCount = detail?.quotation?.warnungen.length ?? 0;
+  if (priceWarningCount > 0) {
+    warnings.push({
+      id: "price-warnings",
+      severity: "warning",
+      step: "positions",
+      title: `${priceWarningCount} Preiswarnung(en) aus Kalkulation`,
+      description: "Das Pricing hat Auffälligkeiten gemeldet (z.B. fehlende Listenpreise).",
+    });
+  }
+
+  if (totalPositions >= 3 && matchRate < 0.5) {
+    warnings.push({
+      id: "low-match-rate",
+      severity: "warning",
+      step: "positions",
+      title: `Niedrige Trefferquote (${Math.round(matchRate * 100)}%)`,
+      description: "Weniger als die Hälfte der Positionen wurde sicher zugeordnet.",
+    });
   }
 
   return {
@@ -201,7 +201,6 @@ if (!(a.datum ?? "").trim()) {
       totalPositions,
       unmatched: unmatched.length,
       unmatchedWithoutPriceOverride: unmatchedWithoutPriceOverride.length,
-      lowConfidence,
       matchRate,
     },
   };

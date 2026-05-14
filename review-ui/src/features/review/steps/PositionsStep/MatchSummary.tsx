@@ -6,9 +6,9 @@ interface MatchSummaryProps {
 
 const ITEMS = [
   { status: "exact", label: "Exakt", color: "text-success" },
-  { status: "fuzzy", label: "Fuzzy", color: "text-info" },
-  { status: "semantic", label: "Semantisch", color: "text-info" },
-  { status: "no_match", label: "Kein Treffer", color: "text-warning" },
+  { status: "fuzzy", label: "Fuzzy", color: "text-ek-blue" },
+  { status: "semantic", label: "Beschreibung", color: "text-warning" },
+  { status: "no_match", label: "Kein Treffer", color: "text-brand" },
 ] as const;
 
 export function MatchSummary({ matches }: MatchSummaryProps) {

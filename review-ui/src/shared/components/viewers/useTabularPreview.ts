@@ -8,7 +8,7 @@ import { env } from "@/shared/lib/env";
  *
  * Mirrors the parsing strategy in `quoting/ui/review_ui/document_view._read_csv_robust`:
  * try multiple separators, pick the one that yields the most columns. For
- * XLSX we use `xlsx` (SheetJS) to read the first sheet only — that's
+ * XLSX we use the patched SheetJS npm fork to read the first sheet only — that's
  * what the Streamlit version does too.
  */
 
@@ -74,9 +74,9 @@ function parseCsv(text: string, isTsv: boolean): TabularData {
 }
 
 async function parseXlsx(buffer: ArrayBuffer): Promise<TabularData> {
-  // Lazy import — xlsx is ~700KB unminified, no point loading it on
+  // Lazy import — SheetJS is large enough that loading it on
   // every page even if no XLSX is open.
-  const XLSX = await import("xlsx");
+  const XLSX = await import("@e965/xlsx");
   const workbook = XLSX.read(buffer, { type: "array" });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) {
