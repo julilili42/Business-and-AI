@@ -251,7 +251,10 @@ def finalize_quotation(review_id: str, payload: FinalizeRequest) -> dict:
             final_pdf_path=final_path.name,
         )
     except Exception as exc:
-        log.exception("finalize: approval transition failed for %s (PDF was written)", review_id)
+        # Roll back the just-written final PDF so the filesystem doesn't
+        # diverge from the approval state.
+        final_path.unlink(missing_ok=True)
+        log.exception("finalize: approval transition failed for %s; rolled back PDF", review_id)
         raise HTTPException(500, f"Status-Übergang fehlgeschlagen: {exc}") from exc
 
     return {"final_pdf_path": record.final_pdf_path or final_path.name}
