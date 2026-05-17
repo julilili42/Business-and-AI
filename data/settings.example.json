@@ -1,12 +1,12 @@
 {
   "company": {
-    "company_name": "ElringKlinger",
-    "company_address": "Industriestraße 17",
-    "company_zip_city": "72581 Dettingen",
+    "company_name": "Beispiel GmbH",
+    "company_address": "Musterstraße 1",
+    "company_zip_city": "12345 Musterstadt",
     "company_country": "Deutschland",
-    "contact_person": "Julian Jurcevic",
-    "contact_phone": "+49 160 1083774",
-    "contact_email": "Julian-jurcevic-2000@web.de",
+    "contact_person": "Max Mustermann",
+    "contact_phone": "+49 000 0000000",
+    "contact_email": "kontakt@example.com",
     "delivery_term": "EXW Werk",
     "payment_term": "30 Tage netto",
     "validity_days": 28

@@ -87,6 +87,13 @@ Poppler/
 
 data/reviews/
 
+# Local user settings — contains PII; commit data/settings.example.json instead.
+data/settings.json
+!data/settings.example.json
+
+# TypeScript incremental build artifacts
+*.tsbuildinfo
+
 .tunnel_url
 
 # Claude
