@@ -106,150 +106,150 @@ export function CustomerForm({
       aria-labelledby="customer-data-heading"
       className="scroll-mt-6 space-y-6"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="customer-data-heading" className="section-label">
-          Kunde &amp; Konditionen
-        </h2>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {showChangeIndicator && <ChangedFieldsIndicator />}
-          {showSaveStatus && (
-            <span className="text-xs font-medium text-muted-foreground" role="status">
-              Änderungen werden gespeichert…
-            </span>
-          )}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="customer-data-heading" className="section-label">
+            Kunde &amp; Anfrage-Header
+          </h2>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {showChangeIndicator && <ChangedFieldsIndicator />}
+            {showSaveStatus && (
+              <span className="text-xs font-medium text-muted-foreground" role="status">
+                Änderungen werden gespeichert…
+              </span>
+            )}
+          </div>
         </div>
-      </div>
-
-      <div className="rounded-lg border border-border bg-surface p-5 shadow-card">
-        <h3 className="mb-4 font-display text-base font-bold tracking-tight">
-          Kunde &amp; Anfrage-Header
-        </h3>
-        <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
-          <FormField
-            label="Firma"
-            evidence={anfrage.header_evidence?.kunde_firma}
-            sourceTarget={headerSourceTarget(anfrage, "kunde_firma", "Firma")}
-            onNavigate={onEvidenceSelect}
-          >
-            <Input
-              {...form.register("kunde_firma")}
-              onBlur={() => commitField("kunde_firma")}
-              placeholder="z. B. Musterfirma GmbH"
-            />
-          </FormField>
-          <FormField
-            label="Ansprechpartner"
-            evidence={anfrage.header_evidence?.kunde_ansprechpartner}
-            sourceTarget={headerSourceTarget(anfrage, "kunde_ansprechpartner", "Ansprechpartner")}
-            onNavigate={onEvidenceSelect}
-          >
-            <Input
-              {...form.register("kunde_ansprechpartner")}
-              onBlur={() => commitField("kunde_ansprechpartner")}
-              placeholder="z. B. Frau Müller"
-            />
-          </FormField>
-          <FormField
-            label="E-Mail"
-            evidence={anfrage.header_evidence?.kunde_email}
-            sourceTarget={headerSourceTarget(anfrage, "kunde_email", "E-Mail")}
-            onNavigate={onEvidenceSelect}
-          >
-            <Input
-              type="email"
-              {...form.register("kunde_email")}
-              onBlur={() => commitField("kunde_email")}
-              placeholder="kontakt@firma.de"
-            />
-          </FormField>
-          <FormField
-            label="Kunden-Nr."
-            evidence={anfrage.header_evidence?.kundennummer}
-            sourceTarget={headerSourceTarget(anfrage, "kundennummer", "Kunden-Nr.")}
-            onNavigate={onEvidenceSelect}
-          >
-            <Input
-              {...form.register("kundennummer")}
-              onBlur={() => commitField("kundennummer")}
-              placeholder="z. B. 1234"
-            />
-          </FormField>
-          <FormField
-            label="Anfrage / Beleg-Nr."
-            evidence={anfrage.header_evidence?.belegnummer}
-            sourceTarget={headerSourceTarget(anfrage, "belegnummer", "Beleg-Nr.")}
-            onNavigate={onEvidenceSelect}
-          >
-            <Input
-              {...form.register("belegnummer")}
-              onBlur={() => commitField("belegnummer")}
-              placeholder="z. B. ANF-2024-001"
-            />
-          </FormField>
-          <FormField
-            label="Datum"
-            evidence={anfrage.header_evidence?.datum}
-            sourceTarget={headerSourceTarget(anfrage, "datum", "Datum")}
-            onNavigate={onEvidenceSelect}
-            sourceButtonClassName="right-12"
-          >
-            <div className="flex min-w-0 gap-1.5">
+        <div className="rounded-lg border border-border bg-surface p-5 shadow-card">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
+            <FormField
+              label="Firma"
+              evidence={anfrage.header_evidence?.kunde_firma}
+              sourceTarget={headerSourceTarget(anfrage, "kunde_firma", "Firma")}
+              onNavigate={onEvidenceSelect}
+            >
               <Input
-                {...form.register("datum")}
-                onBlur={() => commitField("datum")}
-                placeholder="z. B. 15.03.2024"
-                className="min-w-0 flex-1"
+                {...form.register("kunde_firma")}
+                onBlur={() => commitField("kunde_firma")}
+                placeholder="z. B. Musterfirma GmbH"
               />
-              <div className="group relative shrink-0">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={fillToday}
-                  disabled={saveAndRegenerate.isPending}
-                  aria-label="Datum auf heute setzen"
-                  title="Heute"
-                  className="h-10 w-10 text-muted-foreground hover:bg-brand-soft hover:text-brand"
-                >
-                  <CalendarDays className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">Heute</span>
-                </Button>
-                <ShortcutHint keys={["Alt", "H"]} />
+            </FormField>
+            <FormField
+              label="Ansprechpartner"
+              evidence={anfrage.header_evidence?.kunde_ansprechpartner}
+              sourceTarget={headerSourceTarget(anfrage, "kunde_ansprechpartner", "Ansprechpartner")}
+              onNavigate={onEvidenceSelect}
+            >
+              <Input
+                {...form.register("kunde_ansprechpartner")}
+                onBlur={() => commitField("kunde_ansprechpartner")}
+                placeholder="z. B. Frau Müller"
+              />
+            </FormField>
+            <FormField
+              label="E-Mail"
+              evidence={anfrage.header_evidence?.kunde_email}
+              sourceTarget={headerSourceTarget(anfrage, "kunde_email", "E-Mail")}
+              onNavigate={onEvidenceSelect}
+            >
+              <Input
+                type="email"
+                {...form.register("kunde_email")}
+                onBlur={() => commitField("kunde_email")}
+                placeholder="kontakt@firma.de"
+              />
+            </FormField>
+            <FormField
+              label="Kunden-Nr."
+              evidence={anfrage.header_evidence?.kundennummer}
+              sourceTarget={headerSourceTarget(anfrage, "kundennummer", "Kunden-Nr.")}
+              onNavigate={onEvidenceSelect}
+            >
+              <Input
+                {...form.register("kundennummer")}
+                onBlur={() => commitField("kundennummer")}
+                placeholder="z. B. 1234"
+              />
+            </FormField>
+            <FormField
+              label="Anfrage / Beleg-Nr."
+              evidence={anfrage.header_evidence?.belegnummer}
+              sourceTarget={headerSourceTarget(anfrage, "belegnummer", "Beleg-Nr.")}
+              onNavigate={onEvidenceSelect}
+            >
+              <Input
+                {...form.register("belegnummer")}
+                onBlur={() => commitField("belegnummer")}
+                placeholder="z. B. ANF-2024-001"
+              />
+            </FormField>
+            <FormField
+              label="Datum"
+              evidence={anfrage.header_evidence?.datum}
+              sourceTarget={headerSourceTarget(anfrage, "datum", "Datum")}
+              onNavigate={onEvidenceSelect}
+              sourceButtonClassName="right-12"
+            >
+              <div className="flex min-w-0 gap-1.5">
+                <Input
+                  {...form.register("datum")}
+                  onBlur={() => commitField("datum")}
+                  placeholder="z. B. 15.03.2024"
+                  className="min-w-0 flex-1"
+                />
+                <div className="group relative shrink-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={fillToday}
+                    disabled={saveAndRegenerate.isPending}
+                    aria-label="Datum auf heute setzen"
+                    title="Heute"
+                    className="h-10 w-10 text-muted-foreground hover:bg-brand-soft hover:text-brand"
+                  >
+                    <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only">Heute</span>
+                  </Button>
+                  <ShortcutHint keys={["Alt", "H"]} />
+                </div>
               </div>
-            </div>
-          </FormField>
+            </FormField>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-5 shadow-card">
-        <h3 className="mb-4 font-display text-base font-bold tracking-tight">
+      <div className="space-y-3">
+        <h2 className="section-label">
           Kommerzielle Bedingungen
-        </h3>
-        <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
-          <FormField
-            label="Lieferbedingung / Incoterms"
-            evidence={anfrage.header_evidence?.incoterms}
-            sourceTarget={headerSourceTarget(anfrage, "incoterms", "Incoterms")}
-            onNavigate={onEvidenceSelect}
-          >
-            <Input
-              {...form.register("incoterms")}
-              onBlur={() => commitField("incoterms")}
-              placeholder="z. B. EXW Werk"
-            />
-          </FormField>
-          <FormField
-            label="Zahlungsbedingung"
-            evidence={anfrage.header_evidence?.zahlungsbedingungen}
-            sourceTarget={headerSourceTarget(anfrage, "zahlungsbedingungen", "Zahlungsbedingung")}
-            onNavigate={onEvidenceSelect}
-          >
-            <Input
-              {...form.register("zahlungsbedingungen")}
-              onBlur={() => commitField("zahlungsbedingungen")}
-              placeholder="z. B. 30 Tage netto"
-            />
-          </FormField>
+        </h2>
+        <div className="rounded-lg border border-border bg-surface p-5 shadow-card">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
+            <FormField
+              label="Lieferbedingung / Incoterms"
+              evidence={anfrage.header_evidence?.incoterms}
+              sourceTarget={headerSourceTarget(anfrage, "incoterms", "Incoterms")}
+              onNavigate={onEvidenceSelect}
+            >
+              <Input
+                {...form.register("incoterms")}
+                onBlur={() => commitField("incoterms")}
+                placeholder="z. B. EXW Werk"
+              />
+            </FormField>
+            <FormField
+              label="Zahlungsbedingung"
+              evidence={anfrage.header_evidence?.zahlungsbedingungen}
+              sourceTarget={headerSourceTarget(anfrage, "zahlungsbedingungen", "Zahlungsbedingung")}
+              onNavigate={onEvidenceSelect}
+            >
+              <Input
+                {...form.register("zahlungsbedingungen")}
+                onBlur={() => commitField("zahlungsbedingungen")}
+                placeholder="z. B. 30 Tage netto"
+              />
+            </FormField>
+          </div>
         </div>
       </div>
     </section>
