@@ -46,7 +46,6 @@ export function OriginalDocumentViewer({
     mail,
   );
 
-  // Switch tab when evidence points to a specific file.
   useEffect(() => {
     if (!activeSource) return;
     setActiveTab(activeSourceFile ?? "mail");

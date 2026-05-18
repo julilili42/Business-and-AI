@@ -60,9 +60,9 @@ _DIMENSIONS = re.compile(
 @dataclass(frozen=True)
 class _Hit:
     """One Aho-Corasick hit, with positions in the original (un-normalised) text."""
-    segment_idx: int       # index into the segment list
-    orig_start: int        # inclusive
-    orig_end: int          # inclusive
+    segment_idx: int
+    orig_start: int  # inclusive
+    orig_end: int  # inclusive
     record: StammdatenRecord
 
 

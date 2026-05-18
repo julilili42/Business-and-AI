@@ -229,11 +229,7 @@ export function ApprovalPanel({
                         changed_fields: Array.from(changedFields).sort(),
                         warning_acknowledged: issuesHandled,
                       },
-                      {
-                        onError: () => {
-                          // transition.isError becomes true — error rendered below
-                        },
-                      },
+                      { onError: () => {} },
                     );
                   }
                 },

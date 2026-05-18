@@ -27,10 +27,6 @@ import {
   useLlmProbe,
 } from "./useDebug";
 
-// ---------------------------------------------------------------------------
-// Status config
-// ---------------------------------------------------------------------------
-
 const STATUS_CONFIG = {
   ok: {
     icon: CheckCircle2,
@@ -96,10 +92,6 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
 
 function DebugHeader({
   title,
@@ -519,10 +511,6 @@ function StammdatenQualitySection({ quality }: { quality: StammdatenQuality | nu
     </section>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 
 function LlmProviderSection({ checks }: { checks: CheckResult[] }) {
   const llmProbe = useLlmProbe();

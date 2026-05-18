@@ -1,9 +1,3 @@
-/**
- * StatusCard — single-line status display for the panel.
- *
- * Sits below the WorkflowCard. Shows the latest action result and a
- * spinner when the panel is busy.
- */
 type StatusCardProps = {
   status: string;
   loading: boolean;

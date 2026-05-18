@@ -58,6 +58,5 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  // Catch-all → dashboard.
   { path: "*", element: <Navigate to="/" replace /> },
 ]);
