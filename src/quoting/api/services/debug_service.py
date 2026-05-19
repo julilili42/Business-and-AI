@@ -233,42 +233,6 @@ def check_settings_file(path: Path) -> CheckResult:
         return CheckResult(name="settings.json", status="error", detail=f"Parse-Fehler: {e}")
 
 
-def check_pipeline_failures(summary: PipelineFailureSummary) -> CheckResult:
-    if summary.total_failed == 0:
-        return CheckResult(name="Letzte Pipeline-Fehler", status="ok", detail="Keine fehlgeschlagenen Reviews gefunden")
-    latest = summary.recent[0] if summary.recent else None
-    suffix = f" · zuletzt: {latest.review_id} ({latest.current_step})" if latest else ""
-    return CheckResult(
-        name="Letzte Pipeline-Fehler",
-        status="warning",
-        detail=f"{summary.total_failed} fehlgeschlagene Review{'s' if summary.total_failed != 1 else ''}{suffix}",
-    )
-
-
-def check_stammdaten_quality(quality: StammdatenQuality | None) -> CheckResult:
-    if quality is None:
-        return CheckResult(name="Stammdaten-Qualität", status="error", detail="stammdaten.csv konnte nicht gelesen werden")
-
-    hard_issues = (
-        quality.duplicate_article_numbers
-        + quality.missing_article_numbers
-        + quality.missing_descriptions
-        + quality.zero_or_missing_prices
-        + quality.invalid_price_ranges
-    )
-    if hard_issues:
-        return CheckResult(
-            name="Stammdaten-Qualität",
-            status="warning",
-            detail=f"{hard_issues} prüfungsrelevante Auffälligkeiten · {quality.total_rows:,} Artikel",
-        )
-    return CheckResult(
-        name="Stammdaten-Qualität",
-        status="ok",
-        detail=f"{quality.total_rows:,} Artikel · keine kritischen Auffälligkeiten",
-    )
-
-
 # --------------------------------------------------------------------------- aggregations
 def recent_pipeline_failures(
     reviews_root: Path,
@@ -428,8 +392,6 @@ def compute_debug_info(project_root: Path) -> DebugInfo:
         check_disk_space(data_dir),
         check_thresholds(settings),
         check_settings_file(data_dir / "settings.json"),
-        check_pipeline_failures(failures),
-        check_stammdaten_quality(quality),
     ]
 
     statuses = {c.status for c in checks}
