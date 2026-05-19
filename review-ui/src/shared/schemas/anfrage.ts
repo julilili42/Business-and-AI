@@ -1,16 +1,21 @@
 import { z } from "zod";
 
+import type { components } from "@/shared/api-types";
+
 /**
- * zod schemas for the Anfrage / Position model.
- *
- * The shapes mirror `quoting/core/schema.py`. We use `passthrough()` for
- * forward-compatibility — if the backend adds a field, requests still
- * succeed, but the new field won't appear in our types until we extend
- * the schema explicitly.
+ * Types are the single source of truth from the FastAPI OpenAPI schema
+ * (regenerated via `npm run gen:api`). The Zod schemas below are kept only
+ * for runtime validation in the API client — if the wire format drifts
+ * from these, TypeScript will fail where `anfrageSchema.parse(...)` is
+ * assigned to one of the exported types.
  */
 
+export type Evidence = components["schemas"]["Evidence"];
+export type Position = components["schemas"]["Position"];
+export type Anfrage = components["schemas"]["Anfrage"];
+export type Confidence = Position["confidence"];
+
 export const confidenceSchema = z.enum(["high", "medium", "low"]);
-export type Confidence = z.infer<typeof confidenceSchema>;
 
 export const evidenceSchema = z.object({
   source_file: z.string().nullable().optional(),
@@ -18,7 +23,6 @@ export const evidenceSchema = z.object({
   source_row: z.number().int().nullable().optional(),
   source_quote: z.string().nullable().optional(),
 });
-export type Evidence = z.infer<typeof evidenceSchema>;
 
 export const positionSchema = z
   .object({
@@ -43,8 +47,6 @@ export const positionSchema = z
   })
   .passthrough();
 
-export type Position = z.infer<typeof positionSchema>;
-
 export const anfrageSchema = z
   .object({
     belegnummer: z.string().nullable().optional(),
@@ -60,5 +62,3 @@ export const anfrageSchema = z
     header_evidence: z.record(evidenceSchema).default({}),
   })
   .passthrough();
-
-export type Anfrage = z.infer<typeof anfrageSchema>;

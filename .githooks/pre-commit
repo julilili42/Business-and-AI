@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Regenerate review-ui/src/shared/api-types.ts if any FastAPI route or
+# response-model file is staged, then add the regenerated file to the
+# commit so the wire schema can't drift from the checked-in types.
+set -euo pipefail
+
+watched_pattern='^src/quoting/api/(routers/|response_models\.py|review_api\.py|services/)'
+
+if ! git diff --cached --name-only | grep -Eq "$watched_pattern"; then
+    exit 0
+fi
+
+echo "[pre-commit] API route/model changed — regenerating review-ui types"
+npm run --silent gen:api
+
+git add review-ui/src/shared/api-types.ts

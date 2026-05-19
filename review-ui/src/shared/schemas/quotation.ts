@@ -1,8 +1,9 @@
 import { z } from "zod";
 
-/**
- * Mirrors `quoting/pricing/quotation.py::Quotation.to_dict`.
- */
+import type { components } from "@/shared/api-types";
+
+export type QuotationItem = components["schemas"]["QuotationItemModel"];
+export type Quotation = components["schemas"]["QuotationModel"];
 
 export const quotationItemSchema = z
   .object({
@@ -21,8 +22,6 @@ export const quotationItemSchema = z
   })
   .passthrough();
 
-export type QuotationItem = z.infer<typeof quotationItemSchema>;
-
 export const quotationSchema = z
   .object({
     kunde_firma: z.string().nullable(),
@@ -39,13 +38,12 @@ export const quotationSchema = z
   })
   .passthrough();
 
-export type Quotation = z.infer<typeof quotationSchema>;
-
 /**
  * Manual override applied between pricing and rendering.
  *
- * The backend persists these as the `manual_overrides.json` logical payload
- * in SQLite. We send them on every regenerate call.
+ * Backend persists these as opaque dicts (see api/response_models.py); the
+ * discriminated union here is the UI's contract and what the form layer
+ * validates against.
  */
 export const manualOverrideSchema = z.union([
   z.object({

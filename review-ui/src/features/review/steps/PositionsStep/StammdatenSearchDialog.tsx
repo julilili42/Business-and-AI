@@ -163,6 +163,7 @@ export function StammdatenSearchDialog({
       abmessungen: customAbmessungen.trim() || null,
       sales_group: "Custom",
       material_group: "Custom",
+      score: 1,
     };
 
     customMatch.mutate(

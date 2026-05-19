@@ -10,6 +10,14 @@ from pydantic import BaseModel, Field, ValidationError
 
 from quoting.api import _common
 from quoting.api.progress_store import read_progress
+from quoting.api.response_models import (
+    FinalizeResponse,
+    MailMeta,
+    ManualOverridePayload,
+    QuotationModel,
+    ReviewDetail,
+    ReviewListItem,
+)
 from quoting.api.services import review_service as rs
 from quoting.api.services.quality_gate_service import evaluate_quality_gate
 from quoting.api.services.quotation_service import (
@@ -65,7 +73,7 @@ def _load_review_data(review_id: str, pipeline: QuotingPipeline) -> tuple:
     return anfrage, matches, overrides
 
 
-@router.get("/reviews")
+@router.get("/reviews", response_model=list[ReviewListItem])
 def list_reviews() -> list[dict]:
     summaries = scan_reviews()
     return [
@@ -94,7 +102,7 @@ def list_reviews() -> list[dict]:
     ]
 
 
-@router.get("/reviews/{review_id}")
+@router.get("/reviews/{review_id}", response_model=ReviewDetail)
 def get_review_detail(review_id: str) -> dict:
     _common.require_review(review_id)
     pipeline = _common.get_pipeline()
@@ -140,7 +148,7 @@ def delete_review(review_id: str) -> Response:
     return Response(status_code=204)
 
 
-@router.get("/reviews/{review_id}/mail")
+@router.get("/reviews/{review_id}/mail", response_model=MailMeta)
 def get_review_mail(review_id: str) -> dict:
     _common.require_review(review_id)
     meta = get_default_repository().load_mail(review_id) or {}
@@ -152,7 +160,7 @@ class AnfragePayload(BaseModel):
     model_config = {"extra": "allow"}
 
 
-@router.put("/reviews/{review_id}/anfrage")
+@router.put("/reviews/{review_id}/anfrage", response_model=Anfrage)
 def put_anfrage(review_id: str, payload: dict) -> dict:
     _common.require_review(review_id)
     repo = get_default_repository()
@@ -188,7 +196,7 @@ def put_anfrage(review_id: str, payload: dict) -> dict:
     return anfrage.model_dump(mode="json")
 
 
-@router.put("/reviews/{review_id}/overrides")
+@router.put("/reviews/{review_id}/overrides", response_model=list[ManualOverridePayload])
 def put_overrides(review_id: str, payload: list[dict]) -> list[dict]:
     _common.require_review(review_id)
 
@@ -201,7 +209,7 @@ def put_overrides(review_id: str, payload: list[dict]) -> list[dict]:
     return payload
 
 
-@router.post("/reviews/{review_id}/regenerate")
+@router.post("/reviews/{review_id}/regenerate", response_model=QuotationModel)
 def regenerate_quotation(review_id: str) -> dict:
     folder = _common.review_dir(review_id)
     pipeline = _common.get_pipeline()
@@ -238,7 +246,7 @@ class FinalizeRequest(BaseModel):
     exception_reason: str | None = Field(default=None, max_length=1000)
 
 
-@router.post("/reviews/{review_id}/finalize")
+@router.post("/reviews/{review_id}/finalize", response_model=FinalizeResponse)
 def finalize_quotation(review_id: str, payload: FinalizeRequest) -> dict:
     folder = _common.review_dir(review_id)
     pipeline = _common.get_pipeline()

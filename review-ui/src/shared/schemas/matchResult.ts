@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-/**
- * Mirrors `quoting/matching/matcher.py::MatchResult.to_dict`.
- */
+import type { components } from "@/shared/api-types";
+
+export type MatchResult = components["schemas"]["MatchResultModel"];
+export type MatchStatus = MatchResult["status"];
 
 export const matchStatusSchema = z.enum(["exact", "fuzzy", "semantic", "no_match"]);
-export type MatchStatus = z.infer<typeof matchStatusSchema>;
 
 export const matchResultSchema = z
   .object({
@@ -17,5 +17,3 @@ export const matchResultSchema = z
     matched_row: z.record(z.unknown()).nullable().optional(),
   })
   .passthrough();
-
-export type MatchResult = z.infer<typeof matchResultSchema>;
