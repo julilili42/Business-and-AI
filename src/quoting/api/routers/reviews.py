@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 from quoting.api import _common
 from quoting.api.progress_store import read_progress
 from quoting.api.services import review_service as rs
+from quoting.api.services.quality_gate_service import evaluate_quality_gate
 from quoting.api.services.quotation_service import (
     build_quotation_with_overrides,
     filter_redundant_custom_price_overrides,
@@ -225,6 +226,8 @@ def regenerate_quotation(review_id: str) -> dict:
 class FinalizeRequest(BaseModel):
     actor: str = Field(min_length=1)
     filename: str | None = None
+    warning_acknowledged: bool = False
+    exception_reason: str | None = Field(default=None, max_length=1000)
 
 
 @router.post("/reviews/{review_id}/finalize")
@@ -238,6 +241,15 @@ def finalize_quotation(review_id: str, payload: FinalizeRequest) -> dict:
     quotation = build_quotation_with_overrides(
         anfrage, matches, overrides, pipeline.settings.preise_path, review_id
     )
+    quality_gate = evaluate_quality_gate(anfrage, matches, quotation, overrides)
+    if quality_gate.requires_acknowledgement and not payload.warning_acknowledged:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Freigabe benötigt eine bewusste Bestätigung offener Prüfpunkte.",
+                "quality_gate": quality_gate.to_dict(),
+            },
+        )
 
     if payload.filename:
         final_filename = sanitize_pdf_filename(payload.filename)
@@ -259,7 +271,10 @@ def finalize_quotation(review_id: str, payload: FinalizeRequest) -> dict:
             folder,
             target="approved",
             actor=payload.actor,
-            warning_acknowledged=True,
+            warning_acknowledged=bool(
+                payload.warning_acknowledged and quality_gate.requires_acknowledgement
+            ),
+            exception_reason=payload.exception_reason,
             final_pdf_path=final_path.name,
         )
     except Exception as exc:

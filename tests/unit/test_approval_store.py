@@ -60,6 +60,19 @@ def test_final_pdf_path_stored(review_dir):
     assert rec.final_pdf_path == "final.pdf"
 
 
+def test_exception_reason_is_optional_but_persisted_when_present(review_dir):
+    rec = transition(
+        review_dir,
+        "approved",
+        warning_acknowledged=True,
+        exception_reason="  Kunde hat Sonderfreigabe bestätigt  ",
+    )
+
+    assert rec.warning_acknowledged is True
+    assert rec.exception_reason == "Kunde hat Sonderfreigabe bestätigt"
+    assert rec.history[-1]["exception_reason"] == "Kunde hat Sonderfreigabe bestätigt"
+
+
 def test_invalid_transition_is_rejected(review_dir):
     with pytest.raises(ValueError, match="Invalid transition"):
         transition(review_dir, "ready_to_send")  # skip reviewed & approved

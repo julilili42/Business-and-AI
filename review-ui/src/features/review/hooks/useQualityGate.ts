@@ -86,6 +86,9 @@ function evaluate(detail: ReviewDetail | undefined): QualityGateResult {
     }
     return true;
   });
+  const unmatchedWithoutPriceOverridePosNrs = new Set(
+    unmatchedWithoutPriceOverride.map((m) => m.pos_nr),
+  );
 
   const matchedCount = activeMatches.filter((m) => m.status !== "no_match").length;
   const matchRate = totalPositions === 0 ? 1 : matchedCount / totalPositions;
@@ -124,6 +127,19 @@ function evaluate(detail: ReviewDetail | undefined): QualityGateResult {
         step: "customer",
         title: "Ansprechpartner oder E-Mail fehlt",
         description: "Mindestens eines der beiden Felder muss gesetzt sein.",
+      });
+    }
+  }
+
+  for (const item of detail?.quotation?.items ?? []) {
+    if (unmatchedWithoutPriceOverridePosNrs.has(item.pos_nr)) continue;
+    if (item.einzelpreis <= 0 || item.gesamtpreis <= 0) {
+      blockers.push({
+        id: `price:zero:${item.pos_nr}`,
+        severity: "blocker",
+        step: "positions",
+        title: `Pos ${item.pos_nr}: Preis ist 0,00 EUR`,
+        description: "Bitte Stückpreis und Gesamtpreis vor der Freigabe prüfen.",
       });
     }
   }

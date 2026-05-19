@@ -16,6 +16,7 @@ export interface ApprovalTransitionInput {
   target: ApprovalState;
   actor?: string;
   warning_acknowledged?: boolean;
+  exception_reason?: string;
   changed_fields?: string[];
 }
 

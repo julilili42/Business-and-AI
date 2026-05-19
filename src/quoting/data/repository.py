@@ -21,6 +21,7 @@ Public surface
 from __future__ import annotations
 
 import csv
+import os
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -138,11 +139,17 @@ def build_repository(path: Path | None = None) -> StammdatenRepository:
     """Pick a repository for a given stammdaten path.
 
     If ``path`` is missing on disk we fall back to a small mock dataset
-    so demos and tests keep running. This mirrors the historical
-    behaviour of ``quoting.matching.stammdaten.load_stammdaten``.
+    so demos and tests keep running. Production-like environments fail
+    loudly instead of silently quoting against mock master data.
     """
     if path is not None and Path(path).exists():
         return CsvStammdatenRepository(Path(path))
+
+    if _requires_real_stammdaten():
+        location = str(path) if path is not None else "no path configured"
+        raise FileNotFoundError(
+            f"Stammdaten required in production mode, but not found: {location}"
+        )
 
     if path is not None:
         log.warning("Stammdaten not found at %s, using mock data", path)
@@ -207,6 +214,24 @@ def _optional_int(value: object, *, default: int | None = None) -> int | None:
 def _required_int(value: object, *, default: int) -> int:
     parsed = _optional_int(value, default=default)
     return parsed if parsed is not None else default
+
+
+def _requires_real_stammdaten() -> bool:
+    if _env_truthy(os.getenv("QUOTING_REQUIRE_STAMMDATEN")):
+        return True
+
+    env = (
+        os.getenv("QUOTING_ENV")
+        or os.getenv("APP_ENV")
+        or os.getenv("ENVIRONMENT")
+        or os.getenv("ENV")
+        or ""
+    ).strip().lower()
+    return env in {"prod", "production"}
+
+
+def _env_truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _mock_records() -> list[StammdatenRecord]:

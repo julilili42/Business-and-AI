@@ -74,6 +74,13 @@ export interface PdfHighlightResponse {
   message?: string | null;
 }
 
+export interface FinalizeInput {
+  actor: string;
+  filename?: string;
+  warning_acknowledged?: boolean;
+  exception_reason?: string;
+}
+
 const reviewDetailSchema = z.object({
   review_id: z.string(),
   created_at: z.string().nullable().default(null),
@@ -169,12 +176,18 @@ export const reviewsApi = {
 
   finalize: async (
     reviewId: string,
-    actor: string,
-    filename?: string,
+    input: FinalizeInput,
   ): Promise<{ final_pdf_path: string }> => {
     const data = await apiClient.post<unknown>(
       reviewPath(reviewId).finalize,
-      { actor, ...(filename ? { filename } : {}) },
+      {
+        actor: input.actor,
+        ...(input.filename ? { filename: input.filename } : {}),
+        ...(input.warning_acknowledged !== undefined
+          ? { warning_acknowledged: input.warning_acknowledged }
+          : {}),
+        ...(input.exception_reason ? { exception_reason: input.exception_reason } : {}),
+      },
     );
     return z.object({ final_pdf_path: z.string() }).parse(data);
   },

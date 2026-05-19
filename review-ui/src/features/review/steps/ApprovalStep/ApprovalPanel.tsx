@@ -27,6 +27,7 @@ interface ApprovalPanelProps {
    */
   blockerCount: number;
   warningCount: number;
+  embedded?: boolean;
 }
 
 function resolveFilenameTemplate(template: string, customerName: string): string {
@@ -43,6 +44,7 @@ export function ApprovalPanel({
   customerName,
   blockerCount,
   warningCount,
+  embedded = false,
 }: ApprovalPanelProps) {
   const issueCount = blockerCount + warningCount;
   const hasBlockers = blockerCount > 0;
@@ -59,20 +61,24 @@ export function ApprovalPanel({
 
   const [filename, setFilename] = useState(defaultFilename);
   const [issuesAck, setIssuesAck] = useState(false);
+  const [exceptionReason, setExceptionReason] = useState("");
 
   useEffect(() => {
     setFilename(resolveFilenameTemplate(template, customerName));
   }, [template, customerName]);
 
   useEffect(() => {
-    if (issueCount === 0) setIssuesAck(false);
+    if (issueCount === 0) {
+      setIssuesAck(false);
+      setExceptionReason("");
+    }
   }, [issueCount]);
 
   const approved = isApproved(approval);
 
   if (approved) {
-    return (
-      <section className="rounded-lg border border-success/30 bg-success-soft p-5">
+    const approvedContent = (
+      <>
         <div className="mb-3 flex items-center gap-2 text-success">
           <Check className="h-5 w-5" aria-hidden="true" />
           <span className="font-display text-base font-bold">
@@ -108,8 +114,8 @@ export function ApprovalPanel({
           </Button>
         </div>
 
-        <div className="mt-5 border-t border-success/20 pt-5">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="mt-4 border-t border-success/20 pt-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Systemintegration
           </p>
           <div className="flex flex-wrap gap-3">
@@ -146,6 +152,20 @@ export function ApprovalPanel({
             </button>
           </div>
         </div>
+      </>
+    );
+
+    if (embedded) {
+      return (
+        <div className="rounded-md border border-success/30 bg-success-soft p-3">
+          {approvedContent}
+        </div>
+      );
+    }
+
+    return (
+      <section className="rounded-lg border border-success/30 bg-success-soft p-5">
+        {approvedContent}
       </section>
     );
   }
@@ -154,43 +174,100 @@ export function ApprovalPanel({
   const canApprove =
     actor.trim().length > 0 && filename.trim().length > 0 && issuesHandled;
 
-  return (
-    <section className="rounded-lg border border-border bg-surface p-5 shadow-card">
-      <div className="space-y-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs">Freigegeben durch</Label>
-          <Input
-            value={actor}
-            onChange={(e) => setActor(e.target.value)}
-            placeholder="Vor- und Nachname"
-            autoComplete="name"
-          />
-        </div>
+  const form = (
+    <div
+      className={cn(
+        embedded
+          ? "grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end"
+          : "space-y-3",
+      )}
+    >
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold text-foreground">
+          Freigegeben durch
+        </Label>
+        <Input
+          value={actor}
+          onChange={(e) => setActor(e.target.value)}
+          placeholder="Vor- und Nachname"
+          autoComplete="name"
+        />
+      </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs">Dateiname finale PDF</Label>
-          <Input
-            value={filename}
-            onChange={(e) => setFilename(e.target.value)}
-            placeholder="Angebot_Kunde.pdf"
-          />
-        </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold text-foreground">
+          Dateiname finale PDF
+        </Label>
+        <Input
+          value={filename}
+          onChange={(e) => setFilename(e.target.value)}
+          placeholder="Angebot_Kunde.pdf"
+        />
+      </div>
 
-        {issueCount > 0 && (
+      <Button
+        variant="primary"
+        className={embedded ? "w-full lg:w-auto" : undefined}
+        disabled={!canApprove || finalize.isPending}
+        title={
+          !actor.trim()
+            ? "Bitte Namen eintragen."
+            : !filename.trim()
+              ? "Bitte Dateinamen eintragen."
+              : !issuesHandled
+                ? hasBlockers
+                  ? "Bitte Probleme bewusst bestätigen."
+                  : "Bitte Empfehlungen bestätigen."
+                : undefined
+        }
+        onClick={() => {
+          const trimmedReason = exceptionReason.trim();
+          finalize.mutate(
+            {
+              actor: actor.trim(),
+              filename: filename.trim(),
+              warning_acknowledged: issueCount > 0 ? issuesHandled : false,
+              ...(trimmedReason ? { exception_reason: trimmedReason } : {}),
+            },
+            {
+              onSuccess: () => {
+                if (changedFields.size > 0) {
+                  transition.mutate(
+                    {
+                      target: "approved",
+                      actor: actor.trim(),
+                      changed_fields: Array.from(changedFields).sort(),
+                      warning_acknowledged: issuesHandled,
+                      ...(trimmedReason ? { exception_reason: trimmedReason } : {}),
+                    },
+                    { onError: () => {} },
+                  );
+                }
+              },
+            },
+          );
+        }}
+      >
+        {finalize.isPending ? "Final-PDF wird erzeugt…" : "Freigeben"}
+      </Button>
+
+      {issueCount > 0 && (
+        <>
           <label
             className={cn(
-              "flex items-start gap-2 rounded-md border p-3 text-xs",
+              "flex items-start gap-2 rounded-md border p-2.5 text-xs",
+              embedded && "lg:col-span-3",
               hasBlockers
                 ? "border-danger/40 bg-danger-soft"
                 : "border-warning/30 bg-warning-soft",
             )}
           >
             <input
-              type="checkbox"
               className={cn(
                 "mt-0.5 h-4 w-4 cursor-pointer",
                 hasBlockers ? "accent-danger" : "accent-warning",
               )}
+              type="checkbox"
               checked={issuesAck}
               onChange={(e) => setIssuesAck(e.target.checked)}
             />
@@ -200,57 +277,41 @@ export function ApprovalPanel({
                 : "Empfehlungen geprüft und akzeptiert."}
             </span>
           </label>
-        )}
 
-        <Button
-          variant="primary"
-          disabled={!canApprove || finalize.isPending}
-          title={
-            !actor.trim()
-              ? "Bitte Namen eintragen."
-              : !filename.trim()
-                ? "Bitte Dateinamen eintragen."
-                : !issuesHandled
-                  ? hasBlockers
-                    ? "Bitte Probleme bewusst bestätigen."
-                    : "Bitte Empfehlungen bestätigen."
-                  : undefined
-          }
-          onClick={() =>
-            finalize.mutate(
-              { actor: actor.trim(), filename: filename.trim() },
-              {
-                onSuccess: () => {
-                  if (changedFields.size > 0) {
-                    transition.mutate(
-                      {
-                        target: "approved",
-                        actor: actor.trim(),
-                        changed_fields: Array.from(changedFields).sort(),
-                        warning_acknowledged: issuesHandled,
-                      },
-                      { onError: () => {} },
-                    );
-                  }
-                },
-              },
-            )
-          }
-        >
-          {finalize.isPending ? "Final-PDF wird erzeugt…" : "Freigeben"}
-        </Button>
+          <div className={cn("space-y-1.5", embedded && "lg:col-span-3")}>
+            <Label className="text-xs font-semibold text-foreground">
+              Grund für Ausnahme (optional)
+            </Label>
+            <textarea
+              className="flex min-h-[68px] w-full rounded-md border border-input bg-surface px-3 py-2 text-sm leading-relaxed ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              value={exceptionReason}
+              onChange={(e) => setExceptionReason(e.target.value)}
+              placeholder="Kurze Notiz für die Freigabehistorie"
+            />
+          </div>
+        </>
+      )}
 
-        {finalize.isError && (
-          <p className="text-xs text-danger">
-            Final-PDF konnte nicht erzeugt werden.
-          </p>
-        )}
-        {transition.isError && (
-          <p className="text-xs text-danger">
-            Freigabe-Status konnte nicht gesetzt werden.
-          </p>
-        )}
-      </div>
+      {finalize.isError && (
+        <p className={cn("text-xs text-danger", embedded && "lg:col-span-3")}>
+          Final-PDF konnte nicht erzeugt werden.
+        </p>
+      )}
+      {transition.isError && (
+        <p className={cn("text-xs text-danger", embedded && "lg:col-span-3")}>
+          Freigabe-Status konnte nicht gesetzt werden.
+        </p>
+      )}
+    </div>
+  );
+
+  if (embedded) {
+    return form;
+  }
+
+  return (
+    <section className="rounded-lg border border-border bg-surface p-5 shadow-card">
+      {form}
     </section>
   );
 }

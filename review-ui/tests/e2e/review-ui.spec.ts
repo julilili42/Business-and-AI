@@ -20,6 +20,37 @@ test("opens a review from the dashboard and shows extracted position data", asyn
   await expect(page.getByText(/exakt/i).first()).toBeVisible();
 });
 
+test("scrolls the active review step into focus by default", async ({ page }) => {
+  await page.goto(`/reviews/${ids.review}/positions`);
+
+  const main = page.locator("main");
+  await expect
+    .poll(() => main.evaluate((el) => Math.round(el.scrollTop)))
+    .toBeGreaterThan(80);
+
+  const stepTitle = await page.getByText("Anfrage vorbereiten", { exact: true }).first().boundingBox();
+  expect(stepTitle).not.toBeNull();
+  expect(stepTitle!.y).toBeLessThan(90);
+});
+
+test("can disable automatic review step scrolling in settings", async ({ page }) => {
+  await page.goto("/settings");
+
+  const toggle = page.getByRole("switch", { name: "Review-Schritte automatisch fokussieren" });
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await toggle.click();
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Gespeichert", { exact: true })).toBeVisible();
+
+  await page.goto(`/reviews/${ids.review}/approval`);
+  await page.waitForTimeout(500);
+
+  const main = page.locator("main");
+  await expect
+    .poll(() => main.evaluate((el) => Math.round(el.scrollTop)))
+    .toBeLessThan(20);
+});
+
 test("keeps the dashboard table width stable when selecting reviews", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("Preisanfrage 2026-50422")).toBeVisible();
@@ -90,9 +121,25 @@ test("supports undo and redo for position edits", async ({ page }) => {
 test("blocks approval when a position has no master-data match", async ({ page }) => {
   await page.goto(`/reviews/${ids.blockedReview}/approval`);
 
-  await expect(page.getByText(/Probleme offen/i)).toBeVisible();
+  await expect(page.getByText(/Noch nicht versandbereit/i)).toBeVisible();
   await expect(page.getByText(/kein Stammdaten-Treffer/i)).toBeVisible();
   await expect(page.getByRole("button", { name: "Freigeben" })).toBeDisabled();
+});
+
+test("shows the approval risk check and approval action before the document comparison", async ({ page }) => {
+  await page.goto(`/reviews/${ids.blockedReview}/approval`);
+
+  const summaryTop = await page
+    .locator("section[aria-labelledby='approval-summary-heading']")
+    .boundingBox();
+  const approvalTop = await page.getByRole("button", { name: "Freigeben" }).boundingBox();
+  const comparisonTop = await page.getByText("Original", { exact: true }).boundingBox();
+
+  expect(summaryTop).not.toBeNull();
+  expect(approvalTop).not.toBeNull();
+  expect(comparisonTop).not.toBeNull();
+  expect(summaryTop!.y).toBeLessThan(comparisonTop!.y);
+  expect(approvalTop!.y).toBeLessThan(comparisonTop!.y);
 });
 
 test("leaves fullscreen comparison with Escape", async ({ page }) => {
@@ -111,9 +158,9 @@ test("leaves fullscreen comparison with Escape", async ({ page }) => {
 test("finalizes an approved draft and shows the final offer state", async ({ page }) => {
   await page.goto(`/reviews/${ids.review}/approval`);
 
-  await expect(page.getByText(/Freigabefähig/i)).toBeVisible();
+  await expect(page.getByText(/Versandbereit/i)).toBeVisible();
   const summary = page.locator("section[aria-labelledby='approval-summary-heading']");
-  await expect(summary.getByText("Abschluss-Check")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Abschluss & Freigabe" })).toBeVisible();
   await expect(summary.getByText(/2\.447,50/).first()).toBeVisible();
   await page.getByPlaceholder("Vor- und Nachname").fill("Demo User");
   await page.getByRole("button", { name: "Freigeben" }).click();

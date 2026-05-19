@@ -1,4 +1,5 @@
-import { AlertTriangle, ArrowRight, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ArrowRight, ShieldAlert } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import type { ReviewDetail } from "@/shared/api/reviews";
@@ -17,6 +18,7 @@ interface ApprovalSummaryProps {
    * is no longer actionable and the user only needs the price view.
    */
   isApproved: boolean;
+  approvalControls?: ReactNode;
 }
 
 const MATCH_LABEL: Record<MatchStatus, string> = {
@@ -39,7 +41,12 @@ function resolveGateState(gate: QualityGateResult): GateState {
   return "ok";
 }
 
-export function ApprovalSummary({ detail, gate, isApproved }: ApprovalSummaryProps) {
+export function ApprovalSummary({
+  detail,
+  gate,
+  isApproved,
+  approvalControls,
+}: ApprovalSummaryProps) {
   const quotation = detail.quotation;
   const items = quotation?.items ?? [];
   const matchesByPos = new Map(detail.matches.map((match) => [match.pos_nr, match]));
@@ -48,45 +55,40 @@ export function ApprovalSummary({ detail, gate, isApproved }: ApprovalSummaryPro
 
   const state = resolveGateState(gate);
   const showIssues = !isApproved && (gate.blockers.length > 0 || gate.warnings.length > 0);
+  const readinessCopy = resolveReadinessCopy(state, isApproved);
 
   return (
     <section
       aria-labelledby="approval-summary-heading"
-      className="rounded-lg border border-border bg-surface p-5 shadow-card"
+      className="rounded-lg border border-border bg-surface p-4 shadow-card"
     >
-      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <header className="mb-3">
         <div>
-          <h2 id="approval-summary-heading" className="section-label mb-2">
-            Abschluss-Check
-          </h2>
-          <p className="text-sm font-medium text-foreground">
-            Qualität, Preise und Dokumente vor der Freigabe
+          <p className="font-display text-lg font-bold tracking-tight text-foreground">
+            {readinessCopy.title}
+          </p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {readinessCopy.description}
           </p>
         </div>
-        <GateBadge state={state} warningCount={gate.warnings.length} />
-      </header>
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-y border-border py-3 text-sm md:grid-cols-3">
-        <SummaryStat label="Summe" value={formatEur(quotation?.gesamtsumme)} strong />
-        <SummaryStat label="Positionen" value={gate.stats.totalPositions} />
-        <SummaryStat label="Preiskorrektur" value={overrides.length} />
-      </dl>
+      </header>
 
       {showIssues && (
         <IssuesBlock blockers={gate.blockers} warnings={gate.warnings} />
       )}
 
-      <div className="mt-4 overflow-hidden rounded-md border border-border">
-        <div className="max-h-72 overflow-auto">
+      <div className="mt-3 overflow-hidden rounded-md border border-border">
+        <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="sticky top-0 bg-muted text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="w-16 px-3 py-2">Pos</th>
-                <th className="min-w-56 px-3 py-2">Artikel</th>
-                <th className="px-3 py-2 text-right">Menge</th>
-                <th className="px-3 py-2 text-right">Stückpreis</th>
-                <th className="px-3 py-2 text-right">Gesamt</th>
-                <th className="px-3 py-2">Status</th>
+                <th className="w-16 px-3 py-1.5">Pos</th>
+                <th className="min-w-56 px-3 py-1.5">Artikel</th>
+                <th className="px-3 py-1.5 text-right">Menge</th>
+                <th className="px-3 py-1.5 text-right">Stückpreis</th>
+                <th className="px-3 py-1.5 text-right">Gesamt</th>
+                <th className="px-3 py-1.5">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-surface">
@@ -107,11 +109,25 @@ export function ApprovalSummary({ detail, gate, isApproved }: ApprovalSummaryPro
                 </tr>
               )}
             </tbody>
+            <tfoot className="bg-muted/35">
+              <tr>
+                <td
+                  colSpan={4}
+                  className="border-t border-border px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                >
+                  Summe
+                </td>
+                <td className="border-t border-border px-3 py-2.5 text-right font-display text-lg font-bold tabular-nums text-foreground">
+                  {formatEur(quotation?.gesamtsumme)}
+                </td>
+                <td className="border-t border-border px-3 py-2.5" />
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
 
-      {(priceWarningCount > 0 || gate.stats.unmatched > 0 || overrides.length > 0) && (
+      {(priceWarningCount > 0 || gate.stats.unmatched > 0) && (
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           {priceWarningCount > 0 && (
             <SummaryPill tone="warning">{priceWarningCount} Preiswarnung(en)</SummaryPill>
@@ -121,46 +137,46 @@ export function ApprovalSummary({ detail, gate, isApproved }: ApprovalSummaryPro
               {gate.stats.unmatched} Position(en) ohne Treffer
             </SummaryPill>
           )}
-          {overrides.length > 0 && (
-            <SummaryPill tone="neutral">
-              {overrides.length} Preiskorrektur(en)
-            </SummaryPill>
-          )}
+        </div>
+      )}
+
+      {approvalControls && (
+        <div className="mt-4 border-t border-border pt-4">
+          {approvalControls}
         </div>
       )}
     </section>
   );
 }
 
-function GateBadge({ state, warningCount }: { state: GateState; warningCount: number }) {
-  const label =
-    state === "blocked"
-      ? "Probleme offen"
-      : state === "warning"
-        ? `Empfehlungen prüfen (${warningCount})`
-        : "Freigabefähig";
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-semibold",
-        state === "blocked" && "bg-danger-soft text-danger",
-        state === "warning" && "bg-warning-soft text-warning",
-        state === "ok" && "bg-success-soft text-success",
-      )}
-    >
-      {state === "ok" ? (
-        <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-      ) : (
-        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
-      )}
-      {label}
-    </div>
-  );
+function resolveReadinessCopy(state: GateState, isApproved: boolean) {
+  if (isApproved) {
+    return {
+      title: "Freigegeben und versandbereit",
+      description: "Finales Angebot und Freigabestatus sind dokumentiert.",
+    };
+  }
+  if (state === "blocked") {
+    return {
+      title: "Noch nicht versandbereit",
+      description: "Bitte zuerst die offenen Probleme beheben oder bewusst als Ausnahme freigeben.",
+    };
+  }
+  if (state === "warning") {
+    return {
+      title: "Fast versandbereit",
+      description: "Es gibt keine Blocker, aber Empfehlungen sollten vor der Freigabe geprüft werden.",
+    };
+  }
+  return {
+    title: "Versandbereit",
+    description: "Keine offenen Blocker oder Empfehlungen gefunden.",
+  };
 }
 
 function IssuesBlock({ blockers, warnings }: { blockers: Issue[]; warnings: Issue[] }) {
   return (
-    <div className="mt-4 space-y-3">
+    <div className="mt-3 space-y-2">
       {blockers.length > 0 && (
         <IssueGroup
           title={`Probleme (${blockers.length})`}
@@ -195,12 +211,12 @@ function IssueGroup({
       : "border-warning/30 bg-warning-soft text-warning";
 
   return (
-    <div className={cn("rounded-md border p-3", tone)}>
-      <div className="mb-2 flex items-center gap-2">
+    <div className={cn("rounded-md border p-2.5", tone)}>
+      <div className="mb-1.5 flex items-center gap-2">
         <Icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
         <div className="text-xs font-bold uppercase tracking-wide">{title}</div>
       </div>
-      <ul className="space-y-1.5">
+      <ul className="space-y-1">
         {issues.map((issue) => (
           <IssueItem key={issue.id} issue={issue} />
         ))}
@@ -216,7 +232,7 @@ function IssueItem({ issue }: { issue: Issue }) {
     ? `/reviews/${encodeURIComponent(reviewId)}/${issueTarget.slug}#${issueTarget.hash}`
     : null;
   return (
-    <li className="flex items-start gap-3 rounded-sm bg-surface/60 px-2.5 py-1.5 text-sm">
+    <li className="flex items-start gap-3 rounded-sm bg-surface/60 px-2 py-1 text-sm">
       <div className="flex-1 text-foreground">
         <div className="font-semibold">{issue.title}</div>
         {issue.description && (
@@ -236,35 +252,6 @@ function IssueItem({ issue }: { issue: Issue }) {
   );
 }
 
-function SummaryStat({
-  label,
-  value,
-  icon,
-  strong = false,
-}: {
-  label: string;
-  value: string | number;
-  icon?: React.ReactNode;
-  strong?: boolean;
-}) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </dt>
-      <dd
-        className={cn(
-          "mt-1 flex min-w-0 items-center gap-1.5 truncate font-display tracking-tight",
-          strong ? "text-lg font-bold" : "text-base font-semibold",
-        )}
-      >
-        {icon}
-        <span className="truncate">{value}</span>
-      </dd>
-    </div>
-  );
-}
-
 function SummaryRow({
   item,
   matchStatus,
@@ -276,25 +263,25 @@ function SummaryRow({
 }) {
   return (
     <tr>
-      <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+      <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">
         {item.pos_nr}
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-1.5">
         <div className="font-medium text-foreground">{item.artikel_nr || "—"}</div>
         <div className="max-w-[28rem] truncate text-xs text-muted-foreground">
           {item.bezeichnung}
         </div>
       </td>
-      <td className="px-3 py-2 text-right tabular-nums">
+      <td className="px-3 py-1.5 text-right tabular-nums">
         {formatQty(item.menge)} {item.einheit}
       </td>
-      <td className="px-3 py-2 text-right tabular-nums">
+      <td className="px-3 py-1.5 text-right tabular-nums">
         {formatEur(item.einzelpreis)}
       </td>
-      <td className="px-3 py-2 text-right font-semibold tabular-nums">
+      <td className="px-3 py-1.5 text-right font-semibold tabular-nums">
         {formatEur(item.gesamtpreis)}
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-1.5">
         <div className="flex flex-wrap gap-1.5">
           <SummaryPill tone={matchStatus === "no_match" ? "danger" : "neutral"}>
             {MATCH_LABEL[matchStatus]}

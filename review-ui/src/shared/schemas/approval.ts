@@ -22,6 +22,7 @@ export const approvalRecordSchema = z
     changed_fields: z.array(z.string()).default([]),
     final_pdf_path: z.string().nullable().optional(),
     warning_acknowledged: z.boolean().default(false),
+    exception_reason: z.string().nullable().optional(),
     history: z.array(z.record(z.unknown())).default([]),
   })
   .passthrough();

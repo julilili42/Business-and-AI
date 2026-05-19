@@ -16,6 +16,7 @@ from quoting.api import _common
 from quoting.api.approval_store import ApprovalRecord, load_approval, save_approval
 from quoting.api.routers import reviews as reviews_router
 from quoting.api.routers.reviews import FinalizeRequest, finalize_quotation
+from quoting.api.services.quality_gate_service import QualityGateResult, QualityIssue
 
 
 def _prepare_review(tmp_path: Path) -> Path:
@@ -38,6 +39,11 @@ def _patch_handler_dependencies(monkeypatch, tmp_path: Path) -> None:
         reviews_router,
         "build_quotation_with_overrides",
         lambda *_a, **_k: MagicMock(),
+    )
+    monkeypatch.setattr(
+        reviews_router,
+        "evaluate_quality_gate",
+        lambda *_a, **_k: QualityGateResult(blockers=[], warnings=[], stats={}),
     )
 
     def fake_build(_anfrage, _quotation, pdf_path, *, is_final, company_profile):
@@ -85,3 +91,72 @@ def test_finalize_keeps_pdf_and_marks_approved_on_success(tmp_path, monkeypatch)
     assert record.state == "approved"
     assert record.final_pdf_path == "Angebot_Test.pdf"
     assert record.approved_by == "user"
+
+
+def test_finalize_rejects_quality_issues_without_acknowledgement(tmp_path, monkeypatch):
+    folder = _prepare_review(tmp_path)
+    _patch_handler_dependencies(monkeypatch, tmp_path)
+
+    monkeypatch.setattr(
+        reviews_router,
+        "evaluate_quality_gate",
+        lambda *_a, **_k: QualityGateResult(
+            blockers=[
+                QualityIssue(
+                    id="price:zero:1",
+                    severity="blocker",
+                    step="positions",
+                    title="Pos 1: Preis ist 0,00 EUR",
+                )
+            ],
+            warnings=[],
+            stats={},
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        finalize_quotation(
+            "review-finalize",
+            FinalizeRequest(actor="user", filename="Angebot_Test.pdf"),
+        )
+
+    assert exc_info.value.status_code == 409
+    assert not (folder / "Angebot_Test.pdf").exists()
+    assert load_approval(folder).state == "reviewed"
+
+
+def test_finalize_allows_acknowledged_exception_without_reason(tmp_path, monkeypatch):
+    _prepare_review(tmp_path)
+    _patch_handler_dependencies(monkeypatch, tmp_path)
+
+    monkeypatch.setattr(
+        reviews_router,
+        "evaluate_quality_gate",
+        lambda *_a, **_k: QualityGateResult(
+            blockers=[
+                QualityIssue(
+                    id="price:zero:1",
+                    severity="blocker",
+                    step="positions",
+                    title="Pos 1: Preis ist 0,00 EUR",
+                )
+            ],
+            warnings=[],
+            stats={},
+        ),
+    )
+
+    response = finalize_quotation(
+        "review-finalize",
+        FinalizeRequest(
+            actor="user",
+            filename="Angebot_Test.pdf",
+            warning_acknowledged=True,
+        ),
+    )
+
+    assert response["final_pdf_path"] == "Angebot_Test.pdf"
+    record = load_approval(tmp_path / "review-finalize")
+    assert record.state == "approved"
+    assert record.warning_acknowledged is True
+    assert record.exception_reason is None

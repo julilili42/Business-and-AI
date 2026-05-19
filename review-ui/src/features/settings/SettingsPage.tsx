@@ -190,6 +190,12 @@ function SettingsForm({ initial, saving, saveSuccess, saveError, onSave }: Setti
             checked={form.watch("workflow.confirm_before_reset")}
             onCheckedChange={(v) => form.setValue("workflow.confirm_before_reset", v, { shouldDirty: true })}
           />
+          <Toggle
+            label="Review-Schritte automatisch fokussieren"
+            description="Schritt 1 und 2 beim Öffnen direkt an den oberen Rand setzen."
+            checked={form.watch("workflow.auto_scroll_review_steps")}
+            onCheckedChange={(v) => form.setValue("workflow.auto_scroll_review_steps", v, { shouldDirty: true })}
+          />
         </div>
       </SettingsCard>
 
@@ -294,6 +300,7 @@ function Toggle({
       <button
         type="button"
         role="switch"
+        aria-label={label}
         aria-checked={checked}
         onClick={() => onCheckedChange(!checked)}
         className={cn(

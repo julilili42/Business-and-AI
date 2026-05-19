@@ -95,6 +95,7 @@ class ApprovalTransitionRequest(BaseModel):
     target: str
     actor: str | None = None
     warning_acknowledged: bool | None = None
+    exception_reason: str | None = None
     changed_fields: list[str] | None = None
 
 
@@ -182,6 +183,7 @@ def post_approval(review_id: str, payload: ApprovalTransitionRequest):
             actor=payload.actor,
             changed_fields=payload.changed_fields,
             warning_acknowledged=payload.warning_acknowledged,
+            exception_reason=payload.exception_reason,
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc

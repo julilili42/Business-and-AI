@@ -134,12 +134,40 @@ const progress = {
   error: null,
 };
 
+const baseSettings = {
+  company: {
+    company_name: "Demo GmbH",
+    company_address: "Musterstrasse 1",
+    company_zip_city: "12345 Musterstadt",
+    company_country: "Deutschland",
+    contact_person: "Demo User",
+    contact_phone: "+49 30 123456",
+    contact_email: "demo@example.com",
+    delivery_term: "EXW Werk",
+    payment_term: "30 Tage netto",
+    validity_days: 28,
+  },
+  matching: {
+    fuzzy_threshold: 85,
+    semantic_threshold: 70,
+  },
+  workflow: {
+    auto_refresh_pdf: true,
+    confirm_before_reset: true,
+    auto_scroll_review_steps: true,
+    final_pdf_filename_template: "Angebot_[Kunde].pdf",
+    email_subject_template: "Angebot zu Ihrer Anfrage: [Betreff]",
+    email_body_template: "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unser Angebot.",
+  },
+};
+
 export async function mockReviewApi(page: Page) {
   const state: ApiState = {
     approvalState: "draft_generated",
     anfrage: clone(baseAnfrage),
     manualOverrides: [],
   };
+  let settings = clone(baseSettings);
 
   await page.route("**/*", async (route) => {
     const request = route.request();
@@ -149,6 +177,15 @@ export async function mockReviewApi(page: Page) {
 
     if (!path.startsWith("/api/")) {
       return route.continue();
+    }
+
+    if (method === "GET" && path === "/api/settings") {
+      return json(route, settings);
+    }
+
+    if (method === "PUT" && path === "/api/settings") {
+      settings = await request.postDataJSON();
+      return json(route, settings);
     }
 
     if (method === "GET" && path === "/api/reviews") {

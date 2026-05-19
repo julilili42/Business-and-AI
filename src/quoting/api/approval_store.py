@@ -49,6 +49,7 @@ class ApprovalRecord:
     changed_fields: list[str] = field(default_factory=list)
     final_pdf_path: str | None = None
     warning_acknowledged: bool = False
+    exception_reason: str | None = None
     history: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -69,6 +70,7 @@ class ApprovalRecord:
             changed_fields=list(data.get("changed_fields") or []),
             final_pdf_path=data.get("final_pdf_path"),
             warning_acknowledged=bool(data.get("warning_acknowledged", False)),
+            exception_reason=data.get("exception_reason"),
             history=list(data.get("history") or []),
         )
 
@@ -98,6 +100,7 @@ def transition(
     changed_fields: list[str] | None = None,
     final_pdf_path: str | None = None,
     warning_acknowledged: bool | None = None,
+    exception_reason: str | None = None,
 ) -> ApprovalRecord:
     """Move the review to a new state, recording who/when in history."""
     record = load_approval(review_dir)
@@ -113,10 +116,17 @@ def transition(
         record.approved_at = _now_iso()
     elif target == "ready_to_send":
         record.sent_at = _now_iso()
+    elif target == "reviewed":
+        record.exception_reason = None
     if final_pdf_path is not None:
         record.final_pdf_path = final_pdf_path
     if warning_acknowledged is not None:
         record.warning_acknowledged = warning_acknowledged
+    if exception_reason is not None:
+        reason = exception_reason.strip()
+        record.exception_reason = reason or None
+        if reason:
+            entry["exception_reason"] = reason
     if changed_fields is not None:
         record.changed_fields = list(changed_fields)
 

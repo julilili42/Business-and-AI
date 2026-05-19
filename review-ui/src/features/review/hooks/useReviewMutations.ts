@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { reviewsApi } from "@/shared/api/reviews";
+import { reviewsApi, type FinalizeInput } from "@/shared/api/reviews";
 import type { Anfrage } from "@/shared/schemas/anfrage";
 import type { ManualOverride } from "@/shared/schemas/quotation";
 
@@ -51,9 +51,9 @@ export function useFinalize(reviewId: string | undefined) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ actor, filename }: { actor: string; filename?: string }) => {
+    mutationFn: (input: FinalizeInput) => {
       if (!reviewId) throw new Error("reviewId is required");
-      return reviewsApi.finalize(reviewId, actor, filename);
+      return reviewsApi.finalize(reviewId, input);
     },
     onSuccess: () => {
       if (!reviewId) return;

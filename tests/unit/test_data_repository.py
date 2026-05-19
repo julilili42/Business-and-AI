@@ -31,6 +31,12 @@ def csv_file(tmp_path: Path) -> Path:
     return path
 
 
+@pytest.fixture(autouse=True)
+def clear_stammdaten_env(monkeypatch) -> None:
+    for key in ("QUOTING_ENV", "APP_ENV", "ENVIRONMENT", "ENV", "QUOTING_REQUIRE_STAMMDATEN"):
+        monkeypatch.delenv(key, raising=False)
+
+
 class TestStammdatenRecord:
     def test_to_row_round_trips_fields(self) -> None:
         record = StammdatenRecord(
@@ -134,3 +140,15 @@ class TestBuildRepository:
     def test_none_path_yields_mock(self) -> None:
         repo = build_repository(None)
         assert isinstance(repo, InMemoryStammdatenRepository)
+
+    def test_production_mode_rejects_missing_path(self, tmp_path: Path, monkeypatch) -> None:
+        monkeypatch.setenv("QUOTING_ENV", "production")
+
+        with pytest.raises(FileNotFoundError, match="Stammdaten required"):
+            build_repository(tmp_path / "nope.csv")
+
+    def test_require_flag_rejects_none_path(self, monkeypatch) -> None:
+        monkeypatch.setenv("QUOTING_REQUIRE_STAMMDATEN", "1")
+
+        with pytest.raises(FileNotFoundError, match="no path configured"):
+            build_repository(None)
