@@ -18,7 +18,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Literal
 
-from quoting.reviews import get_default_repository
+from quoting.api.container import get_app_container
+from quoting.reviews.sqlite_repository import SQLiteReviewRepository
 
 ApprovalState = Literal[
     "draft_generated",
@@ -75,12 +76,82 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+@dataclass
+class ApprovalStore:
+    repo: SQLiteReviewRepository
+
+    def load(self, review_id: str) -> ApprovalRecord:
+        return ApprovalRecord.from_dict(self.repo.load_approval(review_id))
+
+    def save(self, review_id: str, record: ApprovalRecord) -> None:
+        self.repo.save_approval(review_id, record.to_dict())
+
+    def transition(
+        self,
+        review_id: str,
+        target: ApprovalState,
+        *,
+        actor: str | None = None,
+        changed_fields: list[str] | None = None,
+        final_pdf_path: str | None = None,
+        warning_acknowledged: bool | None = None,
+        exception_reason: str | None = None,
+    ) -> ApprovalRecord:
+        """Move the review to a new state, recording who/when in history."""
+        record = self.load(review_id)
+
+        if target != record.state and target not in VALID_TRANSITIONS.get(record.state, set()):
+            raise ValueError(f"Invalid transition {record.state!r} → {target!r}")
+        entry: dict = {"at": _now_iso(), "from": record.state, "to": target, "actor": actor}
+        record.history.append(entry)
+
+        record.state = target
+        if target == "approved":
+            record.approved_by = actor
+            record.approved_at = _now_iso()
+        elif target == "ready_to_send":
+            record.sent_at = _now_iso()
+        elif target == "reviewed":
+            record.exception_reason = None
+        if final_pdf_path is not None:
+            record.final_pdf_path = final_pdf_path
+        if warning_acknowledged is not None:
+            record.warning_acknowledged = warning_acknowledged
+        if exception_reason is not None:
+            reason = exception_reason.strip()
+            record.exception_reason = reason or None
+            if reason:
+                entry["exception_reason"] = reason
+        if changed_fields is not None:
+            record.changed_fields = list(changed_fields)
+
+        self.save(review_id, record)
+        return record
+
+    def reset(self, review_id: str) -> ApprovalRecord:
+        """Hard reset — used when the user wants to re-run the pipeline."""
+        record = ApprovalRecord(state="draft_generated")
+        self.save(review_id, record)
+        return record
+
+    def mark_field_changed(self, review_id: str, field_path: str) -> None:
+        """Add a field to the changelog without changing state."""
+        record = self.load(review_id)
+        if field_path not in record.changed_fields:
+            record.changed_fields.append(field_path)
+            self.save(review_id, record)
+
+
+def default_approval_store() -> ApprovalStore:
+    return ApprovalStore(get_app_container().review_repo())
+
+
 def load_approval(review_id: str) -> ApprovalRecord:
-    return ApprovalRecord.from_dict(get_default_repository().load_approval(review_id))
+    return default_approval_store().load(review_id)
 
 
 def save_approval(review_id: str, record: ApprovalRecord) -> None:
-    get_default_repository().save_approval(review_id, record.to_dict())
+    default_approval_store().save(review_id, record)
 
 
 def transition(
@@ -93,48 +164,20 @@ def transition(
     warning_acknowledged: bool | None = None,
     exception_reason: str | None = None,
 ) -> ApprovalRecord:
-    """Move the review to a new state, recording who/when in history."""
-    record = load_approval(review_id)
-
-    if target != record.state and target not in VALID_TRANSITIONS.get(record.state, set()):
-        raise ValueError(f"Invalid transition {record.state!r} → {target!r}")
-    entry: dict = {"at": _now_iso(), "from": record.state, "to": target, "actor": actor}
-    record.history.append(entry)
-
-    record.state = target
-    if target == "approved":
-        record.approved_by = actor
-        record.approved_at = _now_iso()
-    elif target == "ready_to_send":
-        record.sent_at = _now_iso()
-    elif target == "reviewed":
-        record.exception_reason = None
-    if final_pdf_path is not None:
-        record.final_pdf_path = final_pdf_path
-    if warning_acknowledged is not None:
-        record.warning_acknowledged = warning_acknowledged
-    if exception_reason is not None:
-        reason = exception_reason.strip()
-        record.exception_reason = reason or None
-        if reason:
-            entry["exception_reason"] = reason
-    if changed_fields is not None:
-        record.changed_fields = list(changed_fields)
-
-    save_approval(review_id, record)
-    return record
+    return default_approval_store().transition(
+        review_id,
+        target,
+        actor=actor,
+        changed_fields=changed_fields,
+        final_pdf_path=final_pdf_path,
+        warning_acknowledged=warning_acknowledged,
+        exception_reason=exception_reason,
+    )
 
 
 def reset_approval(review_id: str) -> ApprovalRecord:
-    """Hard reset — used when the user wants to re-run the pipeline."""
-    record = ApprovalRecord(state="draft_generated")
-    save_approval(review_id, record)
-    return record
+    return default_approval_store().reset(review_id)
 
 
 def mark_field_changed(review_id: str, field_path: str) -> None:
-    """Add a field to the changelog without changing state."""
-    record = load_approval(review_id)
-    if field_path not in record.changed_fields:
-        record.changed_fields.append(field_path)
-        save_approval(review_id, record)
+    default_approval_store().mark_field_changed(review_id, field_path)

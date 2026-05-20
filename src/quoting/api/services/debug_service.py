@@ -12,7 +12,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from quoting.reviews import default_artifact_root, get_default_repository
+from quoting.api import _common
+from quoting.reviews import default_artifact_root
 
 
 # --------------------------------------------------------------------------- models
@@ -194,7 +195,7 @@ def check_writable_dir(path: Path, label: str) -> CheckResult:
 
 
 def check_review_count() -> CheckResult:
-    count = get_default_repository().review_count()
+    count = _common.get_review_repo().review_count()
     if count == 0:
         return CheckResult(name="Vorhandene Reviews", status="ok", detail="Noch keine Reviews")
     return CheckResult(name="Vorhandene Reviews", status="ok", detail=f"{count} Review{'s' if count != 1 else ''}")
@@ -241,7 +242,7 @@ def recent_pipeline_failures(
     *,
     limit: int = 5,
 ) -> PipelineFailureSummary:
-    repo = get_default_repository()
+    repo = _common.get_review_repo()
     failures: list[tuple[float, PipelineFailure]] = []
     for row in repo.list_reviews():
         review_id = str(row["review_id"])

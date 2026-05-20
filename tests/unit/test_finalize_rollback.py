@@ -60,7 +60,7 @@ def test_finalize_rolls_back_pdf_when_transition_fails(review, monkeypatch):
         raise RuntimeError("simulated approval crash")
 
     monkeypatch.setattr(
-        "quoting.api.approval_store.transition",
+        "quoting.api.approval_store.ApprovalStore.transition",
         failing_transition,
     )
 

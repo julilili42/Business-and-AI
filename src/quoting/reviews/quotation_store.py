@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from quoting.pricing import Quotation, QuotationItem
-from quoting.reviews.sqlite_repository import get_default_repository
+from quoting.reviews.sqlite_repository import SQLiteReviewRepository, get_default_repository
 
 
-def load_saved_quotation(review_id: str) -> Quotation | None:
-    data = get_default_repository().load_quotation(review_id)
+def load_saved_quotation(
+    review_id: str,
+    *,
+    repo: SQLiteReviewRepository | None = None,
+) -> Quotation | None:
+    active_repo = repo or get_default_repository()
+    data = active_repo.load_quotation(review_id)
     if not isinstance(data, dict):
         return None
     try:

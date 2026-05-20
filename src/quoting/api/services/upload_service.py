@@ -12,7 +12,6 @@ from quoting.api import _common
 from quoting.api.progress_store import init_progress
 from quoting.api.services.review_service import build_mail
 from quoting.ingestion import detect_file_type
-from quoting.reviews import get_default_repository
 
 _ALLOWED_UPLOAD_TYPES = {"pdf", "xlsx", "csv", "eml", "msg"}
 
@@ -44,7 +43,7 @@ async def create_review_from_upload(file: UploadFile) -> str:
         )
 
     review_id = uuid.uuid4().hex[:12]
-    repo = get_default_repository()
+    repo = _common.get_review_repo()
     repo.create_review(review_id, subject=Path(file.filename).stem, source="upload")
     folder = repo.artifact_dir(review_id)
     folder.mkdir(parents=True, exist_ok=True)

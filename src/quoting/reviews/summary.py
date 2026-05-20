@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 from quoting.reviews.pdfs import find_draft_pdf
-from quoting.reviews.sqlite_repository import get_default_repository
+from quoting.reviews.sqlite_repository import SQLiteReviewRepository, get_default_repository
 
 log = logging.getLogger(__name__)
 
@@ -54,23 +54,29 @@ class ReviewSummary:
         return self.matched / self.positions if self.positions else 0.0
 
 
-def scan_reviews() -> list[ReviewSummary]:
+def scan_reviews(
+    *,
+    repo: SQLiteReviewRepository | None = None,
+) -> list[ReviewSummary]:
     """Return all review summaries from SQLite, newest first."""
-    repo = get_default_repository()
+    active_repo = repo or get_default_repository()
     summaries: list[ReviewSummary] = []
-    for row in repo.list_reviews():
+    for row in active_repo.list_reviews():
         review_id = str(row["review_id"])
         try:
-            summaries.append(_summarize(review_id, row))
+            summaries.append(_summarize(review_id, row, repo=active_repo))
         except Exception as exc:
             log.warning("Skipping malformed review %s: %s", review_id, exc)
             continue
     return summaries
 
 
-def _summarize(review_id: str, row: dict) -> ReviewSummary:
-    repo = get_default_repository()
-
+def _summarize(
+    review_id: str,
+    row: dict,
+    *,
+    repo: SQLiteReviewRepository,
+) -> ReviewSummary:
     mail = repo.load_mail(review_id) or {}
     extraction = repo.load_anfrage(review_id) or {}
     quotation = repo.load_quotation(review_id) or {}
@@ -87,7 +93,7 @@ def _summarize(review_id: str, row: dict) -> ReviewSummary:
     match_counts = _count_by_key(
         matches, "status", ("exact", "fuzzy", "semantic", "no_match")
     )
-    pdf_path = find_draft_pdf(review_id)
+    pdf_path = find_draft_pdf(review_id, repo=repo)
 
     approval_state = approval.get("state") or row.get("approval_state")
     if approval_state in {"approved", "ready_to_send"}:

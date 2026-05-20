@@ -12,7 +12,6 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from quoting.api import _common
-from quoting.reviews import get_default_repository
 from quoting.reviews.source_highlights import (
     HighlightResult,
     TargetKind,
@@ -32,7 +31,7 @@ def _resolve_review_attachment(review_id: str, filename: str) -> Path:
     if not safe_name or safe_name != filename or safe_name in {".", ".."}:
         raise HTTPException(400, "Invalid filename")
 
-    doc = get_default_repository().current_document(
+    doc = _common.get_review_repo().current_document(
         review_id, kind="attachment", filename=safe_name
     )
     path = _document_path(doc)
@@ -153,7 +152,7 @@ def _document_path(doc: dict[str, Any] | None) -> Path | None:
 
 
 def _original_document_paths(review_id: str) -> list[Path]:
-    repo = get_default_repository()
+    repo = _common.get_review_repo()
     paths: list[Path] = []
     for kind in ("attachment", "original"):
         for doc in repo.list_documents(review_id, kind=kind):

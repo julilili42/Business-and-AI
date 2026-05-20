@@ -6,15 +6,17 @@ FastAPI dependencies. Used by the reviews/stammdaten routers.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quoting.api.approval_store import load_approval, transition
+from quoting.api.approval_store import ApprovalStore
+from quoting.api.container import get_app_container
 from quoting.core import Anfrage
 from quoting.ingestion import Mail, detect_file_type, mail_from_file, parse_mail
 from quoting.matching import MatchResult, match_positions
 from quoting.pipeline import QuotingPipeline
-from quoting.reviews import get_default_repository
+from quoting.reviews.sqlite_repository import SQLiteReviewRepository
 
 
 def normalise_article_key(value: str | None) -> str:
@@ -31,63 +33,149 @@ def find_stammdaten_by_article(pipeline: QuotingPipeline, artikelnummer: str) ->
     return None
 
 
-def try_load_anfrage(review_id: str) -> Anfrage | None:
-    """Return the first valid cached Anfrage, or None if not found."""
-    data = get_default_repository().load_anfrage(review_id)
-    if isinstance(data, dict) and data.get("positionen") is not None:
-        return Anfrage.model_validate(data)
-    return None
-
-
-def try_load_original_anfrage(review_id: str) -> Anfrage | None:
-    """Return the initial extraction snapshot, ignoring reviewed edits."""
-    data = get_default_repository().load_extracted(review_id)
-    if isinstance(data, dict) and data.get("positionen") is not None:
-        return Anfrage.model_validate(data)
-    return None
-
-
 def build_mail(input_path: Path) -> Mail:
     if detect_file_type(input_path) in ("eml", "msg"):
         return parse_mail(input_path)
     return mail_from_file(input_path)
 
 
+@dataclass
+class ReviewDataService:
+    repo: SQLiteReviewRepository
+    approval_store: ApprovalStore | None = None
+
+    @property
+    def approvals(self) -> ApprovalStore:
+        if self.approval_store is None:
+            self.approval_store = ApprovalStore(self.repo)
+        return self.approval_store
+
+    def try_load_anfrage(self, review_id: str) -> Anfrage | None:
+        """Return the first valid cached Anfrage, or None if not found."""
+        data = self.repo.load_anfrage(review_id)
+        if isinstance(data, dict) and data.get("positionen") is not None:
+            return Anfrage.model_validate(data)
+        return None
+
+    def try_load_original_anfrage(self, review_id: str) -> Anfrage | None:
+        """Return the initial extraction snapshot, ignoring reviewed edits."""
+        data = self.repo.load_extracted(review_id)
+        if isinstance(data, dict) and data.get("positionen") is not None:
+            return Anfrage.model_validate(data)
+        return None
+
+    def mail_from_meta(self, mail_meta: dict, review_id: str) -> Mail:
+        """Reconstruct a Mail object from stored input metadata."""
+        attachments: list[Path] = []
+        for att in mail_meta.get("attachments") or []:
+            if not isinstance(att, dict) or not att.get("name"):
+                continue
+            doc = self.repo.current_document(
+                review_id,
+                kind="attachment",
+                filename=str(att["name"]),
+            )
+            path = _document_path(doc)
+            if path is not None:
+                attachments.append(path)
+        return Mail(
+            subject=str(mail_meta.get("subject") or ""),
+            sender=str(mail_meta.get("from") or mail_meta.get("sender") or ""),
+            body=str(mail_meta.get("body") or ""),
+            attachments=attachments,
+        )
+
+    def load_or_extract_anfrage(self, review_id: str, pipeline: QuotingPipeline) -> Anfrage:
+        cached = self.try_load_anfrage(review_id)
+        if cached is not None:
+            return cached
+
+        mail = self.mail_from_meta(self.repo.load_mail(review_id) or {}, review_id)
+
+        from quoting.pipeline import StepContext
+
+        folder = self.repo.artifact_dir(review_id)
+
+        def snapshot_sink(name: str, data: Any) -> None:
+            self.repo.save_payload(review_id, name, data)
+
+        return pipeline.extract(mail, StepContext(work_dir=folder, snapshot_sink=snapshot_sink))
+
+    def load_or_recompute_matches(
+        self,
+        review_id: str,
+        anfrage: Anfrage,
+        pipeline: QuotingPipeline,
+    ) -> list[MatchResult]:
+        data = self.repo.load_matches(review_id)
+
+        if isinstance(data, list) and data:
+            saved_matches = [
+                MatchResult(
+                    pos_nr=int(item.get("pos_nr", 0)),
+                    status=item.get("status", "no_match"),
+                    score=float(item.get("score", 0) or 0),
+                    matched_artikelnr=item.get("matched_artikelnr"),
+                    matched_bezeichnung=item.get("matched_bezeichnung"),
+                    matched_row=item.get("matched_row"),
+                )
+                for item in data
+                if isinstance(item, dict)
+            ]
+            active_pos_nrs = {pos.pos_nr for pos in anfrage.positionen}
+            saved_by_pos = {
+                match.pos_nr: match
+                for match in saved_matches
+                if match.pos_nr in active_pos_nrs
+            }
+
+            if len(saved_by_pos) == len(active_pos_nrs):
+                return [saved_by_pos[pos.pos_nr] for pos in anfrage.positionen]
+
+            recomputed = match_positions(
+                anfrage.positionen,
+                pipeline.stammdaten,
+                fuzzy_threshold=pipeline.settings.fuzzy_threshold,
+                semantic_threshold=pipeline.settings.semantic_threshold,
+            )
+            return [saved_by_pos.get(match.pos_nr, match) for match in recomputed]
+
+        return match_positions(
+            anfrage.positionen,
+            pipeline.stammdaten,
+            fuzzy_threshold=pipeline.settings.fuzzy_threshold,
+            semantic_threshold=pipeline.settings.semantic_threshold,
+        )
+
+    def invalidate_approval(self, review_id: str) -> None:
+        record = self.approvals.load(review_id)
+        if record.state in {"approved", "ready_to_send"}:
+            self.approvals.transition(
+                review_id,
+                target="reviewed",
+                actor=record.approved_by,
+            )
+
+
+def default_review_data_service() -> ReviewDataService:
+    repo = get_app_container().review_repo()
+    return ReviewDataService(repo=repo, approval_store=ApprovalStore(repo))
+
+
+def try_load_anfrage(review_id: str) -> Anfrage | None:
+    return default_review_data_service().try_load_anfrage(review_id)
+
+
+def try_load_original_anfrage(review_id: str) -> Anfrage | None:
+    return default_review_data_service().try_load_original_anfrage(review_id)
+
+
 def mail_from_meta(mail_meta: dict, review_id: str) -> Mail:
-    """Reconstruct a Mail object from stored input metadata."""
-    repo = get_default_repository()
-    attachments: list[Path] = []
-    for att in mail_meta.get("attachments") or []:
-        if not isinstance(att, dict) or not att.get("name"):
-            continue
-        doc = repo.current_document(review_id, kind="attachment", filename=str(att["name"]))
-        path = _document_path(doc)
-        if path is not None:
-            attachments.append(path)
-    return Mail(
-        subject=str(mail_meta.get("subject") or ""),
-        sender=str(mail_meta.get("from") or mail_meta.get("sender") or ""),
-        body=str(mail_meta.get("body") or ""),
-        attachments=attachments,
-    )
+    return default_review_data_service().mail_from_meta(mail_meta, review_id)
 
 
 def load_or_extract_anfrage(review_id: str, pipeline: QuotingPipeline) -> Anfrage:
-    cached = try_load_anfrage(review_id)
-    if cached is not None:
-        return cached
-
-    repo = get_default_repository()
-    mail = mail_from_meta(repo.load_mail(review_id) or {}, review_id)
-
-    from quoting.pipeline import StepContext
-
-    folder = repo.artifact_dir(review_id)
-
-    def snapshot_sink(name: str, data: Any) -> None:
-        repo.save_payload(review_id, name, data)
-
-    return pipeline.extract(mail, StepContext(work_dir=folder, snapshot_sink=snapshot_sink))
+    return default_review_data_service().load_or_extract_anfrage(review_id, pipeline)
 
 
 def load_or_recompute_matches(
@@ -95,45 +183,10 @@ def load_or_recompute_matches(
     anfrage: Anfrage,
     pipeline: QuotingPipeline,
 ) -> list[MatchResult]:
-    repo = get_default_repository()
-    data = repo.load_matches(review_id)
-
-    if isinstance(data, list) and data:
-        saved_matches = [
-            MatchResult(
-                pos_nr=int(item.get("pos_nr", 0)),
-                status=item.get("status", "no_match"),
-                score=float(item.get("score", 0) or 0),
-                matched_artikelnr=item.get("matched_artikelnr"),
-                matched_bezeichnung=item.get("matched_bezeichnung"),
-                matched_row=item.get("matched_row"),
-            )
-            for item in data
-            if isinstance(item, dict)
-        ]
-        active_pos_nrs = {pos.pos_nr for pos in anfrage.positionen}
-        saved_by_pos = {
-            match.pos_nr: match
-            for match in saved_matches
-            if match.pos_nr in active_pos_nrs
-        }
-
-        if len(saved_by_pos) == len(active_pos_nrs):
-            return [saved_by_pos[pos.pos_nr] for pos in anfrage.positionen]
-
-        recomputed = match_positions(
-            anfrage.positionen,
-            pipeline.stammdaten,
-            fuzzy_threshold=pipeline.settings.fuzzy_threshold,
-            semantic_threshold=pipeline.settings.semantic_threshold,
-        )
-        return [saved_by_pos.get(match.pos_nr, match) for match in recomputed]
-
-    return match_positions(
-        anfrage.positionen,
-        pipeline.stammdaten,
-        fuzzy_threshold=pipeline.settings.fuzzy_threshold,
-        semantic_threshold=pipeline.settings.semantic_threshold,
+    return default_review_data_service().load_or_recompute_matches(
+        review_id,
+        anfrage,
+        pipeline,
     )
 
 
@@ -195,9 +248,7 @@ def upsert_match(matches: list[MatchResult], new_match: MatchResult) -> list[Mat
 
 
 def invalidate_approval(review_id: str) -> None:
-    record = load_approval(review_id)
-    if record.state in {"approved", "ready_to_send"}:
-        transition(review_id, target="reviewed", actor=record.approved_by)
+    default_review_data_service().invalidate_approval(review_id)
 
 
 def clean_required_text(value: str, field_name: str) -> str:

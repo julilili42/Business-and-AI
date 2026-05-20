@@ -11,7 +11,6 @@ from quoting.api import _common
 from quoting.api.services import review_service as rs
 from quoting.api.services.quotation_service import remove_position_price_overrides
 from quoting.matching import MatchResult
-from quoting.reviews import get_default_repository
 
 router = APIRouter()
 
@@ -124,7 +123,7 @@ class CustomArticleRequest(BaseModel):
 def _set_manual_match(review_id: str, pos_nr: int, artikel_nr: str) -> dict:
     _common.require_review(review_id)
     pipeline = _common.get_pipeline()
-    repo = get_default_repository()
+    repo = _common.get_review_repo()
 
     record = pipeline.stammdaten_repo.by_artikelnr(artikel_nr)
     if record is None:
@@ -186,7 +185,7 @@ def create_custom_article_match(
 ) -> dict:
     _common.require_review(review_id)
     pipeline = _common.get_pipeline()
-    repo = get_default_repository()
+    repo = _common.get_review_repo()
 
     artikel_nr = rs.clean_required_text(payload.artikel_nr, "artikel_nr")
     bezeichnung = rs.clean_required_text(payload.bezeichnung, "bezeichnung")

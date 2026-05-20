@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from quoting.reviews.sqlite_repository import get_default_repository
+from quoting.api import _common
 
 
 def _extract_summary_metrics(summary: dict) -> tuple[int, float, float, float]:
@@ -72,7 +72,7 @@ def _accumulate_review_into(
 
 
 def compute_metrics() -> dict:
-    repo = get_default_repository()
+    repo = _common.get_review_repo()
     per_review: list[dict] = []
     agg: dict = dict(
         total_reviews=0, completed_reviews=0, total_positions=0,

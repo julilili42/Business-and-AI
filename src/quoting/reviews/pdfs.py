@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .sqlite_repository import get_default_repository
+from .sqlite_repository import SQLiteReviewRepository, get_default_repository
 
 
 def draft_pdf_filename(review_id: str) -> str:
@@ -22,26 +22,44 @@ def final_pdf_filename(review_id: str) -> str:
     return f"Angebot_{review_id}_FINAL.pdf"
 
 
-def find_draft_pdf(review_id: str) -> Path | None:
+def find_draft_pdf(
+    review_id: str,
+    *,
+    repo: SQLiteReviewRepository | None = None,
+) -> Path | None:
     """Locate the draft PDF for a review, regardless of approval state."""
-    return _registered_pdf(review_id, "draft_pdf")
+    return _registered_pdf(review_id, "draft_pdf", repo=repo)
 
 
-def find_final_pdf(review_id: str) -> Path | None:
+def find_final_pdf(
+    review_id: str,
+    *,
+    repo: SQLiteReviewRepository | None = None,
+) -> Path | None:
     """Locate the final (approved) PDF for a review, or ``None``."""
-    return _registered_pdf(review_id, "final_pdf")
+    return _registered_pdf(review_id, "final_pdf", repo=repo)
 
 
-def find_current_pdf(review_id: str) -> tuple[Path | None, bool]:
+def find_current_pdf(
+    review_id: str,
+    *,
+    repo: SQLiteReviewRepository | None = None,
+) -> tuple[Path | None, bool]:
     """Return ``(path, is_final)`` — final PDF if approved, else draft."""
-    final = find_final_pdf(review_id)
+    final = find_final_pdf(review_id, repo=repo)
     if final is not None:
         return final, True
-    return find_draft_pdf(review_id), False
+    return find_draft_pdf(review_id, repo=repo), False
 
 
-def _registered_pdf(review_id: str, kind: str) -> Path | None:
-    doc = get_default_repository().current_document(review_id, kind=kind)
+def _registered_pdf(
+    review_id: str,
+    kind: str,
+    *,
+    repo: SQLiteReviewRepository | None = None,
+) -> Path | None:
+    active_repo = repo or get_default_repository()
+    doc = active_repo.current_document(review_id, kind=kind)
     if not doc:
         return None
     path = Path(str(doc.get("storage_path") or ""))
