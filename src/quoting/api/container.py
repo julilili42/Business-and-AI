@@ -100,22 +100,28 @@ class AppContainer:
             )
         return self._step_handlers
 
-    def pipeline_coordinator(
-        self,
-        *,
-        review_ui_base_url: str = "http://localhost:8501",
-    ) -> PipelineCoordinator:
+    def pipeline_coordinator(self) -> PipelineCoordinator:
         """Build (and cache) the coordinator that drives review pipelines.
 
         The coordinator is a singleton owned by the FastAPI lifespan; the
         worker dispatches against ``coordinator.worker_handlers()`` and
         ``ReviewWorkflowService`` enqueues new runs via
         ``coordinator.start_pipeline``.
+
+        The Review-UI URL is read from ``STREAMLIT_BASE_URL`` at build
+        time instead of being passed in — otherwise the first caller's
+        URL would be cached for the process lifetime and any later
+        caller passing a different URL would be silently ignored.
         """
         if self._pipeline_coordinator is None:
+            import os
+
             from quoting.api.pipeline_coordinator import PipelineCoordinator
 
             repo = self.review_repo()
+            review_ui_base_url = os.getenv(
+                "STREAMLIT_BASE_URL", "http://localhost:8501"
+            )
 
             def build_completion_payload(review_id: str) -> dict:
                 from quoting.reviews import api_base_url
@@ -176,7 +182,7 @@ class AppContainer:
             review_data=review_data,
             review_read_service=review_reads,
             approval_transition=approval_transition,
-            coordinator=self.pipeline_coordinator(review_ui_base_url=review_ui_base_url),
+            coordinator=self.pipeline_coordinator(),
         )
 
 

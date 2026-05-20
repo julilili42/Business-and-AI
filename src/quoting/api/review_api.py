@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     consistent queue.
     """
     container = get_app_container()
-    coordinator = container.pipeline_coordinator(review_ui_base_url=STREAMLIT_BASE_URL)
+    coordinator = container.pipeline_coordinator()
     worker = JobWorker(
         queue=container.job_queue(),
         handlers=coordinator.worker_handlers(),
