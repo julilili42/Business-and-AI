@@ -1,10 +1,10 @@
-from quoting.api import _common, frontend_router
-from quoting.api.frontend_router import (
-    _enrich_exact_article_edits,
-    _filter_redundant_custom_price_overrides,
-    _remove_position_price_overrides,
+from quoting.api import _common
+from quoting.api.routers.stammdaten import CustomArticleRequest, create_custom_article_match
+from quoting.api.services.quotation_service import (
+    filter_redundant_custom_price_overrides,
+    remove_position_price_overrides,
 )
-from quoting.api.services.review_service import ReviewDataService
+from quoting.api.services.review_service import ReviewDataService, enrich_exact_article_edits
 from quoting.core import Anfrage
 from quoting.data import InMemoryStammdatenRepository, StammdatenRecord
 from quoting.matching import MatchResult
@@ -42,7 +42,7 @@ def test_exact_article_edit_fills_stammdaten_fields(make_position):
         ]
     )
 
-    enriched = _enrich_exact_article_edits(anfrage, previous, _PipelineStub())  # type: ignore[arg-type]
+    enriched = enrich_exact_article_edits(anfrage, previous, _PipelineStub())  # type: ignore[arg-type]
     pos = enriched.positionen[0]
 
     assert pos.artikelnummer == "001GLP108015"
@@ -71,7 +71,7 @@ def test_same_article_does_not_overwrite_manual_description(make_position):
         ]
     )
 
-    enriched = _enrich_exact_article_edits(anfrage, previous, _PipelineStub())  # type: ignore[arg-type]
+    enriched = enrich_exact_article_edits(anfrage, previous, _PipelineStub())  # type: ignore[arg-type]
 
     assert enriched.positionen[0].bezeichnung == "Manuell geändert"
 
@@ -135,9 +135,9 @@ def test_custom_article_match_persists_review_local_article(
 
     monkeypatch.setattr(_common, "_pipeline", _PipelineStub())
 
-    response = frontend_router.create_custom_article_match(
+    response = create_custom_article_match(
         review_id,
-        frontend_router.CustomArticleRequest(
+        CustomArticleRequest(
             pos_nr=1,
             artikel_nr=" CUST-001 ",
             bezeichnung=" Custom Dichtung ",
@@ -186,7 +186,7 @@ def test_custom_article_match_persists_review_local_article(
 
 
 def test_custom_article_removes_existing_pos_price_overrides():
-    updated = _remove_position_price_overrides(
+    updated = remove_position_price_overrides(
         [
             {
                 "target": "pos",
@@ -215,7 +215,7 @@ def test_custom_article_removes_existing_pos_price_overrides():
 
 
 def test_redundant_custom_price_override_is_hidden_from_review_detail():
-    filtered = _filter_redundant_custom_price_overrides(
+    filtered = filter_redundant_custom_price_overrides(
         [
             {
                 "target": "pos",

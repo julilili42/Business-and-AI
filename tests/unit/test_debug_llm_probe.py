@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from quoting.api import frontend_router
+from quoting.api.routers.debug import probe_llm_provider
+from quoting.api.services.debug_service import recent_pipeline_failures, stammdaten_quality
 from quoting.extraction.llm.base import LLMResponse, TokenUsage
 from quoting.reviews import Payloads
 
@@ -31,7 +32,7 @@ def test_probe_llm_provider_returns_ok(monkeypatch):
         lambda settings: _OkClient(),
     )
 
-    result = frontend_router.probe_llm_provider()
+    result = probe_llm_provider()
 
     assert result.status == "ok"
     assert result.provider == "gemini"
@@ -49,7 +50,7 @@ def test_probe_llm_provider_returns_scrubbed_error(monkeypatch):
         lambda settings: _FailingClient(f"provider rejected key {secret}"),
     )
 
-    result = frontend_router.probe_llm_provider()
+    result = probe_llm_provider()
 
     assert result.status == "error"
     assert result.error_type == "RuntimeError"
@@ -91,7 +92,7 @@ def test_recent_pipeline_failures_reads_latest_and_scrubs_secret(sqlite_repo):
         },
     )
 
-    summary = frontend_router._recent_pipeline_failures(settings)
+    summary = recent_pipeline_failures(settings)
 
     assert summary.total_failed == 2
     assert summary.recent[0].review_id == "newer-review"
@@ -114,7 +115,7 @@ def test_stammdaten_quality_counts_pricing_and_identity_issues(tmp_path):
         encoding="utf-8",
     )
 
-    quality = frontend_router._stammdaten_quality(csv_path)
+    quality = stammdaten_quality(csv_path)
 
     assert quality is not None
     assert quality.total_rows == 5
