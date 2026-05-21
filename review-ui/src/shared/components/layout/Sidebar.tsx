@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Activity, ChevronDown, ChevronUp, Database, Keyboard, LayoutDashboard, Mail, Settings as SettingsIcon } from "lucide-react";
+import { Activity, ChevronDown, ChevronUp, Database, Info, Keyboard, LayoutDashboard, Mail, Settings as SettingsIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useHotkeys } from "react-hotkeys-hook";
 
@@ -74,6 +74,23 @@ export function Sidebar({ pageActions }: SidebarProps) {
           {pageActions}
         </div>
       )}
+
+      <div
+        className="border-t border-border bg-muted/30 px-4 py-3 text-[11px] leading-snug text-muted-foreground"
+        role="note"
+      >
+        <div className="mb-1 flex items-center gap-1.5 font-semibold text-foreground">
+          <Info className="h-3 w-3" aria-hidden="true" />
+          Datenschutz
+        </div>
+        <p>
+          RFQ-Inhalte werden zur Extraktion an einen externen KI-Anbieter
+          übertragen. Details:{" "}
+          <code className="rounded bg-foreground/5 px-1 py-0.5 font-mono">
+            docs/DATENSCHUTZ.md
+          </code>
+        </p>
+      </div>
 
       <div className="border-t border-border">
         <button

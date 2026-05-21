@@ -252,7 +252,18 @@ export function PositionsEditor({
           <h2 id="positions-heading" className="section-label mb-2">
             Positionen
           </h2>
-          <MatchSummary matches={activeMatches} />
+          {activeMatches.length === 0 && anfrage.positionen.length > 0 ? (
+            <span className="text-xs italic text-muted-foreground">
+              Matching läuft …
+            </span>
+          ) : (
+            <MatchSummary matches={activeMatches} />
+          )}
+          {activeMatches.length > 0 && quotation == null ? (
+            <span className="ml-3 text-xs italic text-muted-foreground">
+              Preise werden berechnet …
+            </span>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">

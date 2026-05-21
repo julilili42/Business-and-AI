@@ -13,6 +13,7 @@ import { StepIndicator } from "./components/StepIndicator";
 import { useApproval } from "./hooks/useApproval";
 import { useReview } from "./hooks/useReview";
 import { useReviewStatus } from "./hooks/useReviewStatus";
+import { useReviewStream } from "./hooks/useReviewStream";
 import { useReviewUiStore } from "./stores/reviewUiStore";
 
 class StepErrorBoundary extends React.Component<
@@ -79,12 +80,13 @@ export function ReviewDetailPage() {
   }, [reviewId, setActiveReview]);
 
   const status = useReviewStatus(reviewId);
+  useReviewStream(reviewId);
   const pipelineStatus = status.data?.status ?? null;
   const isPipelineRunning =
     pipelineStatus === "running" || pipelineStatus === "failed";
   const shouldLoadDetail =
     Boolean(reviewId) &&
-    (status.isError || pipelineStatus === "completed");
+    (status.isError || pipelineStatus !== null);
   const review = useReview(reviewId, { enabled: shouldLoadDetail });
   const approval = useApproval(reviewId);
   const settings = useSettings();
@@ -132,7 +134,11 @@ export function ReviewDetailPage() {
     );
   }
 
-  if (isPipelineRunning && status.data) {
+  const showProgressOnly =
+    Boolean(status.data) &&
+    (pipelineStatus === "failed" || (pipelineStatus === "running" && !detail));
+
+  if (showProgressOnly && status.data) {
     return (
       <PageContainer>
         <ReviewHero
@@ -146,7 +152,7 @@ export function ReviewDetailPage() {
     );
   }
 
-  if (status.isLoading || review.isLoading || !review.isFetched) {
+  if (status.isLoading || (!detail && (review.isLoading || !review.isFetched))) {
     return (
       <PageContainer>
         <LoadingState label={status.isLoading ? "Lade Status…" : "Lade Review…"} />
@@ -194,6 +200,11 @@ export function ReviewDetailPage() {
         isApproved={approved}
         approvedAt={approvedAt}
       />
+      {pipelineStatus === "running" && status.data ? (
+        <div className="mb-6">
+          <PipelineProgress progress={status.data} />
+        </div>
+      ) : null}
       <div ref={stepAnchorRef} className="mb-8">
         <StepIndicator />
       </div>

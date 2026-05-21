@@ -46,8 +46,8 @@ export function ApprovalPanel({
   warningCount,
   embedded = false,
 }: ApprovalPanelProps) {
-  const issueCount = blockerCount + warningCount;
   const hasBlockers = blockerCount > 0;
+  const hasWarnings = warningCount > 0;
   const actor = useReviewUiStore((s) => s.approvalActor);
   const setActor = useReviewUiStore((s) => s.setApprovalActor);
   const changedFields = useReviewUiStore((s) => s.changedFields);
@@ -60,7 +60,7 @@ export function ApprovalPanel({
   const defaultFilename = resolveFilenameTemplate(template, customerName);
 
   const [filename, setFilename] = useState(defaultFilename);
-  const [issuesAck, setIssuesAck] = useState(false);
+  const [warningsAck, setWarningsAck] = useState(false);
   const [exceptionReason, setExceptionReason] = useState("");
 
   useEffect(() => {
@@ -68,11 +68,11 @@ export function ApprovalPanel({
   }, [template, customerName]);
 
   useEffect(() => {
-    if (issueCount === 0) {
-      setIssuesAck(false);
+    if (!hasWarnings) {
+      setWarningsAck(false);
       setExceptionReason("");
     }
-  }, [issueCount]);
+  }, [hasWarnings]);
 
   const approved = isApproved(approval);
 
@@ -170,9 +170,12 @@ export function ApprovalPanel({
     );
   }
 
-  const issuesHandled = issueCount === 0 || issuesAck;
+  const warningsHandled = !hasWarnings || warningsAck;
   const canApprove =
-    actor.trim().length > 0 && filename.trim().length > 0 && issuesHandled;
+    actor.trim().length > 0 &&
+    filename.trim().length > 0 &&
+    !hasBlockers &&
+    warningsHandled;
 
   const form = (
     <div
@@ -214,11 +217,11 @@ export function ApprovalPanel({
             ? "Bitte Namen eintragen."
             : !filename.trim()
               ? "Bitte Dateinamen eintragen."
-              : !issuesHandled
-                ? hasBlockers
-                  ? "Bitte Probleme bewusst bestätigen."
-                  : "Bitte Empfehlungen bestätigen."
-                : undefined
+              : hasBlockers
+                ? `${blockerCount} Blocker müssen behoben werden (z.B. 0,00-€-Positionen oder fehlende Stammdaten-Treffer).`
+                : !warningsHandled
+                  ? "Bitte Empfehlungen bestätigen."
+                  : undefined
         }
         onClick={() => {
           const trimmedReason = exceptionReason.trim();
@@ -226,7 +229,7 @@ export function ApprovalPanel({
             {
               actor: actor.trim(),
               filename: filename.trim(),
-              warning_acknowledged: issueCount > 0 ? issuesHandled : false,
+              warning_acknowledged: hasWarnings ? warningsAck : false,
               ...(trimmedReason ? { exception_reason: trimmedReason } : {}),
             },
             {
@@ -237,7 +240,7 @@ export function ApprovalPanel({
                       target: "approved",
                       actor: actor.trim(),
                       changed_fields: Array.from(changedFields).sort(),
-                      warning_acknowledged: issuesHandled,
+                      warning_acknowledged: hasWarnings ? warningsAck : false,
                       ...(trimmedReason ? { exception_reason: trimmedReason } : {}),
                     },
                     { onError: () => {} },
@@ -251,30 +254,39 @@ export function ApprovalPanel({
         {finalize.isPending ? "Final-PDF wird erzeugt…" : "Freigeben"}
       </Button>
 
-      {issueCount > 0 && (
+      {hasBlockers && (
+        <div
+          className={cn(
+            "flex items-start gap-2 rounded-md border border-danger/40 bg-danger-soft p-2.5 text-xs text-foreground",
+            embedded && "lg:col-span-3",
+          )}
+          role="alert"
+        >
+          <span aria-hidden="true" className="mt-0.5 text-danger">⛔</span>
+          <span>
+            <strong>Freigabe gesperrt:</strong> {blockerCount}{" "}
+            {blockerCount === 1 ? "Blocker" : "Blocker"} müssen behoben werden,
+            bevor das Angebot rausgehen kann. Siehe Liste oben.
+          </span>
+        </div>
+      )}
+
+      {hasWarnings && (
         <>
           <label
             className={cn(
-              "flex items-start gap-2 rounded-md border p-2.5 text-xs",
+              "flex items-start gap-2 rounded-md border border-warning/30 bg-warning-soft p-2.5 text-xs",
               embedded && "lg:col-span-3",
-              hasBlockers
-                ? "border-danger/40 bg-danger-soft"
-                : "border-warning/30 bg-warning-soft",
             )}
           >
             <input
-              className={cn(
-                "mt-0.5 h-4 w-4 cursor-pointer",
-                hasBlockers ? "accent-danger" : "accent-warning",
-              )}
+              className="mt-0.5 h-4 w-4 cursor-pointer accent-warning"
               type="checkbox"
-              checked={issuesAck}
-              onChange={(e) => setIssuesAck(e.target.checked)}
+              checked={warningsAck}
+              onChange={(e) => setWarningsAck(e.target.checked)}
             />
             <span className="text-foreground">
-              {hasBlockers
-                ? "Trotz offener Punkte freigeben."
-                : "Empfehlungen geprüft und akzeptiert."}
+              Empfehlungen geprüft und akzeptiert.
             </span>
           </label>
 

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from quoting.api.container import get_app_container
+from quoting.api.progress_bus import ProgressBus, default_progress_bus
 from quoting.reviews.sqlite_repository import SQLiteReviewRepository
 
 _log = logging.getLogger("quoting.progress_store")
@@ -30,8 +31,13 @@ def _now_iso() -> str:
 
 
 class ProgressStore:
-    def __init__(self, repo: SQLiteReviewRepository):
+    def __init__(
+        self,
+        repo: SQLiteReviewRepository,
+        bus: ProgressBus | None = None,
+    ):
         self.repo = repo
+        self.bus = bus if bus is not None else default_progress_bus()
 
     def init(self, review_id: str) -> dict[str, Any]:
         now = _now_iso()
@@ -137,6 +143,7 @@ class ProgressStore:
             data["error"] = detail or f"Step failed: {step_name}"
 
         self.write(review_id, data)
+        self.bus.publish(review_id, {"event": "progress", "data": data})
 
     def complete(self, review_id: str, result: dict[str, Any]) -> None:
         data = self.read(review_id)
@@ -163,6 +170,7 @@ class ProgressStore:
         data["updated_at"] = now
 
         self.write(review_id, data)
+        self.bus.publish(review_id, {"event": "done", "data": data})
 
     def fail(self, review_id: str, error: str) -> None:
         data = self.read(review_id)
@@ -186,6 +194,7 @@ class ProgressStore:
         data["updated_at"] = now
 
         self.write(review_id, data)
+        self.bus.publish(review_id, {"event": "error", "data": data})
 
 
 def default_progress_store() -> ProgressStore:

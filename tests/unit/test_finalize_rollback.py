@@ -129,12 +129,13 @@ def test_finalize_rejects_quality_issues_without_acknowledgement(
     assert ApprovalStore(sqlite_repo).load(review_id).state == "reviewed"
 
 
-def test_finalize_allows_acknowledged_exception_without_reason(
+def test_finalize_blocker_cannot_be_overridden_by_acknowledgement(
     review,
     monkeypatch,
     sqlite_repo,
 ):
-    review_id, _ = review
+    """Hard-block: a blocker must reject finalize even with warning_acknowledged=True."""
+    review_id, folder = review
     _patch_handler_dependencies(monkeypatch)
 
     monkeypatch.setattr(
@@ -150,6 +151,47 @@ def test_finalize_allows_acknowledged_exception_without_reason(
                 )
             ],
             warnings=[],
+            stats={},
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        finalize_quotation(
+            review_id,
+            FinalizeRequest(
+                actor="user",
+                filename="Angebot_Test.pdf",
+                warning_acknowledged=True,
+            ),
+        )
+
+    assert exc_info.value.status_code == 409
+    assert not (folder / "Angebot_Test.pdf").exists()
+    assert ApprovalStore(sqlite_repo).load(review_id).state == "reviewed"
+
+
+def test_finalize_allows_acknowledged_warning(
+    review,
+    monkeypatch,
+    sqlite_repo,
+):
+    """Warnings (not blockers) can be acknowledged and the finalize passes."""
+    review_id, _ = review
+    _patch_handler_dependencies(monkeypatch)
+
+    monkeypatch.setattr(
+        reviews_router,
+        "evaluate_quality_gate",
+        lambda *_a, **_k: QualityGateResult(
+            blockers=[],
+            warnings=[
+                QualityIssue(
+                    id="belegnummer-missing",
+                    severity="warning",
+                    step="customer",
+                    title="Belegnummer leer",
+                )
+            ],
             stats={},
         ),
     )

@@ -212,6 +212,9 @@ export function WorkflowCard({
                 <RefreshIcon className="btn-icon" />
                 Mail neu laden
               </button>
+              <p className="privacy-footnote">
+                Mail und Anhänge gehen zur Extraktion an Gemini bzw. Azure OpenAI.
+              </p>
             </>
           )}
 

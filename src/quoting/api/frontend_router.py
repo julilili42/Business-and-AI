@@ -21,6 +21,9 @@ from quoting.api.routers import (
     debug as _debug_router,
 )
 from quoting.api.routers import (
+    events as _events_router,
+)
+from quoting.api.routers import (
     metrics as _metrics_router,
 )
 from quoting.api.routers import (
@@ -36,6 +39,7 @@ from quoting.api.routers import (
 router = APIRouter(prefix="/api", tags=["frontend"])
 router.include_router(_metrics_router.router)
 router.include_router(_reviews_router.router)
+router.include_router(_events_router.router)
 router.include_router(_attachments_router.router)
 router.include_router(_upload_router.router)
 router.include_router(_stammdaten_router.router)

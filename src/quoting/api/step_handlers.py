@@ -68,12 +68,24 @@ class StepHandlers:
         return self._data_service
 
     # ---------------------------------------------------------------- helpers
+    _PAYLOAD_EVENT_MAP = {
+        "extracted": "extracted",
+        "matches": "matched",
+        "quotation": "priced",
+    }
+
     def _ctx(self, review_id: str) -> StepContext:
         """StepContext wired to persist payloads + report progress for ``review_id``."""
         folder = self.repo.artifact_dir(review_id)
 
         def snapshot_sink(name: str, data: Any) -> None:
             self.repo.save_payload(review_id, name, data)
+            event_name = self._PAYLOAD_EVENT_MAP.get(name)
+            if event_name is not None:
+                self.progress_store.bus.publish(
+                    review_id,
+                    {"event": event_name, "data": data},
+                )
 
         def on_progress(progress: StepProgress) -> None:
             self.progress_store.update_step(

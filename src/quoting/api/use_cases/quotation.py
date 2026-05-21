@@ -125,10 +125,20 @@ class FinalizeQuotationUseCase:
             review_id,
         )
         quality_gate = self.quality_gate_evaluator(anfrage, matches, quotation, overrides)
-        if quality_gate.requires_acknowledgement and not warning_acknowledged:
+        if quality_gate.blockers:
             raise UseCaseConflict(
                 {
-                    "message": "Freigabe benötigt eine bewusste Bestätigung offener Prüfpunkte.",
+                    "message": (
+                        "Freigabe nicht möglich: bitte alle Blocker beheben "
+                        "(z.B. 0,00-€-Positionen oder Positionen ohne Stammdaten-Treffer)."
+                    ),
+                    "quality_gate": quality_gate.to_dict(),
+                },
+            )
+        if quality_gate.warnings and not warning_acknowledged:
+            raise UseCaseConflict(
+                {
+                    "message": "Freigabe benötigt eine bewusste Bestätigung der Warnungen.",
                     "quality_gate": quality_gate.to_dict(),
                 },
             )
@@ -164,7 +174,7 @@ class FinalizeQuotationUseCase:
                 target="approved",
                 actor=actor,
                 warning_acknowledged=bool(
-                    warning_acknowledged and quality_gate.requires_acknowledgement
+                    warning_acknowledged and quality_gate.warnings
                 ),
                 exception_reason=exception_reason,
                 final_pdf_path=final_path.name,
