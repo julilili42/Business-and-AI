@@ -304,6 +304,13 @@ html, body {
     gap: 8px;
 }
 
+.primary-action-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 34px;
+    align-items: stretch;
+    gap: 8px;
+}
+
 .btn {
     display: inline-flex;
     align-items: center;
@@ -372,6 +379,126 @@ html, body {
 .btn-danger-ghost:hover:not(:disabled) {
     background: var(--ek-danger-soft);
     border-color: var(--ek-danger-border);
+}
+
+.action-help {
+    position: relative;
+    display: inline-flex;
+}
+
+.action-help-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 100%;
+    min-height: 38px;
+    border: 1px solid var(--ek-border-strong);
+    border-radius: 10px;
+    background: var(--ek-surface);
+    color: var(--ek-muted);
+    font-family: "Inter Tight", sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: help;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.action-help-button:hover,
+.action-help-button:focus-visible {
+    background: var(--outlook-blue-soft);
+    border-color: var(--outlook-blue);
+    color: var(--outlook-blue-hover);
+    outline: none;
+}
+
+.action-help-tooltip {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    width: min(280px, calc(100vw - 28px));
+    padding: 9px 10px;
+    border: 1px solid var(--ek-border-strong);
+    border-radius: 8px;
+    background: var(--ek-text);
+    color: white;
+    font-size: 11.5px;
+    font-weight: 500;
+    line-height: 1.45;
+    box-shadow: var(--ek-shadow-2);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    pointer-events: none;
+    transition:
+        opacity 0.12s ease,
+        transform 0.12s ease,
+        visibility 0.12s ease;
+}
+
+.action-help-tooltip::after {
+    content: "";
+    position: absolute;
+    right: 12px;
+    bottom: -5px;
+    width: 10px;
+    height: 10px;
+    background: var(--ek-text);
+    transform: rotate(45deg);
+}
+
+.action-help:hover .action-help-tooltip,
+.action-help:focus-within .action-help-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.secondary-actions {
+    border-top: 1px solid var(--ek-divider);
+    padding-top: 2px;
+}
+
+.secondary-actions > summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 5px 8px;
+    color: var(--ek-muted);
+    cursor: pointer;
+    font-size: 11.5px;
+    font-weight: 650;
+    list-style: none;
+    user-select: none;
+}
+
+.secondary-actions > summary::-webkit-details-marker {
+    display: none;
+}
+
+.secondary-actions > summary > svg {
+    transition: transform 0.15s ease;
+}
+
+.secondary-actions[open] > summary > svg {
+    transform: rotate(180deg);
+}
+
+.secondary-actions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 4px;
+}
+
+.secondary-actions-list .btn {
+    padding: 8px 12px;
+    font-size: 12.5px;
 }
 
 /* ---------------- Batch review creation ------------------------------- */
@@ -507,13 +634,6 @@ html, body {
     border: 1px solid var(--ek-info-border);
     color: var(--ek-info);
 }
-.privacy-footnote {
-    margin: 4px 2px 0;
-    font-size: 10.5px;
-    line-height: 1.4;
-    color: var(--ek-muted);
-}
-
 /* ---------------- Empty state ----------------------------------------- */
 .empty-state {
     display: flex;
@@ -701,46 +821,6 @@ html, body {
     flex-shrink: 0;
 }
 
-/* ---------------- Quoting Übersicht link (prominent) ------------------ */
-.overview-link {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    width: 100%;
-    padding: 14px 16px;
-    background: linear-gradient(135deg, var(--ek-brand-soft) 0%, white 100%);
-    border: 1px solid var(--ek-brand-border);
-    border-radius: 12px;
-    font-family: "Inter Tight", sans-serif;
-    font-weight: 700;
-    font-size: 14px;
-    letter-spacing: -0.01em;
-    color: var(--ek-brand-dark);
-    cursor: pointer;
-    transition: all 0.18s ease;
-    box-shadow: var(--ek-shadow-1);
-}
-.overview-link:hover {
-    border-color: var(--ek-brand);
-    background: linear-gradient(135deg, var(--ek-brand-soft) 0%, var(--ek-brand-soft) 100%);
-    transform: translateY(-1px);
-    box-shadow: var(--ek-shadow-2);
-}
-.overview-link-text {
-    flex: 1 1 auto;
-    text-align: left;
-}
-.overview-link-icon {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    transition: transform 0.18s ease;
-}
-.overview-link:hover .overview-link-icon {
-    transform: translate(2px, -2px);
-}
-
 /* ---------------- Outlook blue overrides ------------------ */
 :root {
     --outlook-blue: #0f6cbd;
@@ -767,19 +847,5 @@ html, body {
         90deg,
         var(--outlook-blue) 0%,
         var(--outlook-blue-hover) 100%
-    );
-}
-
-.overview-link {
-    background: linear-gradient(135deg, var(--outlook-blue-soft) 0%, white 100%);
-    border-color: var(--outlook-blue-border);
-    color: var(--outlook-blue-hover);
-}
-.overview-link:hover {
-    border-color: var(--outlook-blue);
-    background: linear-gradient(
-        135deg,
-        var(--outlook-blue-soft) 0%,
-        var(--outlook-blue-soft) 100%
     );
 }

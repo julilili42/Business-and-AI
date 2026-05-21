@@ -6,7 +6,6 @@
  *   Steps indicator
  *   WorkflowCard          ← single source of truth (state + progress in one)
  *   StatusCard            ← only shown for active loading/error feedback
- *   Quoting-Übersicht link ← prominent, with arrow
  *
  * State source of truth
  * ---------------------
@@ -35,7 +34,6 @@ import {
   BatchWorkflowCard,
   type BatchDraftItem,
 } from "./components/BatchWorkflowCard";
-import { ExternalIcon } from "./components/Icons";
 import { StatusCard } from "./components/StatusCard";
 import { Steps } from "./components/Steps";
 import { WorkflowCard } from "./components/WorkflowCard";
@@ -80,14 +78,16 @@ function reviewUiUrl(reviewId: string): string {
 
 function formatProgressStatus(progress: PipelineProgress): string {
   if (progress.status === "failed") {
-    return `Pipeline-Fehler bei ${progress.current_step}: ${
-      progress.error || "Unbekannter Fehler"
-    }`;
+    return progress.error
+      ? `Fehler: ${progress.error}`
+      : "Pipeline fehlgeschlagen.";
   }
   if (progress.status === "completed") {
-    return "Pipeline abgeschlossen. Review ist bereit.";
+    return "Review bereit.";
   }
-  return `Pipeline läuft: ${progress.current_step}`;
+  return progress.current_step
+    ? `${progress.current_step} läuft.`
+    : "Pipeline läuft.";
 }
 
 function formatSelectionStatus(items: SelectedMailSummary[]): string {
@@ -121,21 +121,6 @@ function isCompletedBatch(items: BatchDraftItem[]): boolean {
   );
 }
 
-function OverviewLink() {
-  return (
-    <button
-      className="overview-link"
-      onClick={() => openUrl(REVIEW_OVERVIEW_URL)}
-      type="button"
-    >
-      <span className="overview-link-text">
-        Quoting-Übersicht öffnen
-      </span>
-      <ExternalIcon className="overview-link-icon" />
-    </button>
-  );
-}
-
 function App() {
   const [isOutlook, setIsOutlook] = useState(false);
   const [mailId, setMailId] = useState<string | null>(null);
@@ -145,7 +130,7 @@ function App() {
   const [workflow, setWorkflow] = useState<MailWorkflow | null>(null);
   const [pipelineProgress, setPipelineProgress] =
     useState<PipelineProgress | null>(null);
-  const [status, setStatus] = useState("Bereit. Add-in wartet auf Outlook.");
+  const [status, setStatus] = useState("Bereit.");
   const [loading, setLoading] = useState(false);
 
   const pollingReviewIdRef = useRef<string | null>(null);
@@ -178,32 +163,28 @@ function App() {
       setWorkflow(wf);
       return wf;
     } catch (error) {
-      setStatus(`Fehler beim Laden des Workflows: ${String(error)}`);
+      setStatus(`Workflow konnte nicht geladen werden: ${String(error)}`);
       return workflow;
     }
   }
 
   async function loadMail() {
     setLoading(true);
-    setStatus("Lade Outlook-Auswahl…");
+    setStatus("Lade Auswahl…");
     try {
       const currentItem = Office.context?.mailbox?.item;
       setBatchItems([]);
 
       if (currentItem) {
         setSelectedItems([]);
-        setStatus("Lade Mail-Inhalt und Anhänge…");
+        setStatus("Lade Mail…");
         const mail = await readMailSnapshot();
         const id = deriveMailId(currentItem, mail);
         const { workflow: existingWorkflow } = await loadServerWorkflow(id);
         setMailId(id);
         setSnapshot(mail);
         setWorkflow(existingWorkflow);
-        setStatus(
-          `Mail geladen — ${mail.attachments.length} ${
-            mail.attachments.length === 1 ? "Anhang" : "Anhänge"
-          }.`,
-        );
+        setStatus("Mail geladen.");
         return;
       }
 
@@ -228,20 +209,16 @@ function App() {
         return;
       }
 
-      setStatus("Lade Mail-Inhalt und Anhänge…");
+      setStatus("Lade Mail…");
       const mail = await readSelectedMailSnapshot(selected[0].itemId);
       const id = deriveMailId({ itemId: selected[0].itemId }, mail);
       const { workflow: existingWorkflow } = await loadServerWorkflow(id);
       setMailId(id);
       setSnapshot(mail);
       setWorkflow(existingWorkflow);
-      setStatus(
-        `Mail geladen — ${mail.attachments.length} ${
-          mail.attachments.length === 1 ? "Anhang" : "Anhänge"
-        }.`,
-      );
+      setStatus("Mail geladen.");
     } catch (error) {
-      setStatus(`Fehler beim Laden der Mail: ${String(error)}`);
+      setStatus(`Mail konnte nicht geladen werden: ${String(error)}`);
     } finally {
       setLoading(false);
     }
@@ -266,7 +243,7 @@ function App() {
     setBatchItems(
       selectedItems.map((item) => ({ ...item, status: "pending" })),
     );
-    setStatus("Batch gestartet.");
+    setStatus("Reviews werden vorbereitet.");
 
     let completedCount = 0;
     let failedCount = 0;
@@ -280,7 +257,7 @@ function App() {
     for (const selected of selectedItems) {
       patchBatchItem(selected.itemId, {
         status: "loading",
-        detail: "Mail-Inhalt und Anhänge werden geladen…",
+        detail: "Mail wird geladen…",
       });
 
       try {
@@ -289,7 +266,7 @@ function App() {
         jobs.push({ selected, mail, itemMailId });
         patchBatchItem(selected.itemId, {
           status: "pending",
-          detail: "Bereit für Pipeline",
+          detail: "Bereit",
         });
       } catch (error) {
         failedCount += 1;
@@ -306,7 +283,7 @@ function App() {
       return;
     }
 
-    setStatus("Pipelines werden gestartet…");
+    setStatus("Reviews laufen…");
 
     async function processOne({
       selected,
@@ -319,7 +296,7 @@ function App() {
     }) {
       patchBatchItem(selected.itemId, {
         status: "running",
-        detail: "Pipeline wird gestartet…",
+        detail: "Startet…",
       });
 
       try {
@@ -327,7 +304,7 @@ function App() {
         patchBatchItem(selected.itemId, {
           status: "running",
           reviewId: started.review_id,
-          detail: "Pipeline läuft…",
+          detail: "Läuft…",
         });
 
         const completed = await pollReviewUntilComplete(
@@ -369,8 +346,8 @@ function App() {
 
     setStatus(
       failedCount > 0
-        ? `${completedCount} Reviews erstellt, ${failedCount} fehlgeschlagen.`
-        : `${completedCount} Reviews erstellt. Bereit zur Review-Inbox.`,
+        ? `${completedCount} erstellt, ${failedCount} fehlgeschlagen.`
+        : `${completedCount} Reviews bereit.`,
     );
     setLoading(false);
   }
@@ -395,7 +372,7 @@ function App() {
       );
       const updated = await refreshServerWorkflow(targetMailId);
       setPipelineProgress(completed.progress ?? null);
-      setStatus(`Review erstellt: ${completed.review_id}.`);
+      setStatus("Review bereit.");
       if (openWhenReady && updated) {
         handleOpenReview(updated);
       }
@@ -409,7 +386,7 @@ function App() {
     if (!mailId) return;
     setLoading(true);
     setPipelineProgress(null);
-    setStatus("Review wird gestartet…");
+    setStatus("Review startet…");
     try {
       const mail = snapshot ?? (await readMailSnapshot());
       setSnapshot(mail);
@@ -417,17 +394,17 @@ function App() {
       // Refresh once now so the card flips to review_running immediately;
       // pipeline polling below will pull in the completed state later.
       await refreshServerWorkflow(mailId);
-      setStatus(`Pipeline gestartet: ${started.review_id}.`);
+      setStatus("Extraktion läuft…");
       await awaitReviewCompletion(started, mailId, openWhenReady);
     } catch (error) {
-      setStatus(`Fehler beim Erstellen des Reviews: ${String(error)}`);
+      setStatus(`Review konnte nicht erstellt werden: ${String(error)}`);
       setLoading(false);
     }
   }
 
   async function handleOpenReview(wf: MailWorkflow | null = workflow) {
     if (!wf?.reviewId || !mailId) {
-      setStatus("Kein Review zur Mail vorhanden.");
+      setStatus("Kein Review vorhanden.");
       return;
     }
     openUrl(reviewUiUrl(wf.reviewId));
@@ -443,22 +420,22 @@ function App() {
         console.warn("mark-opened failed:", error);
       }
     }
-    setStatus(`Review-UI geöffnet (${wf.reviewId}).`);
+    setStatus("Review geöffnet.");
   }
 
   async function handleCreateDraftMail() {
     if (!workflow?.reviewId || !mailId) {
-      setStatus("Kein Review zur Mail vorhanden.");
+      setStatus("Kein Review vorhanden.");
       return;
     }
     if (workflow.state !== "approved" && workflow.state !== "quote_sent") {
       setStatus(
-        "Bitte zuerst die Freigabe in der Review-UI erteilen.",
+        "Freigabe fehlt.",
       );
       return;
     }
     setLoading(true);
-    setStatus("Öffne Angebotsmail mit finaler PDF…");
+    setStatus("Öffne Angebotsmail…");
     const reviewId = workflow.reviewId;
     try {
       const { kundenFirma, recipientEmail, templates } = await getMailSettings(reviewId).catch(
@@ -491,7 +468,7 @@ function App() {
       }
       await refreshServerWorkflow(mailId);
     } catch (error) {
-      setStatus(`Fehler beim Öffnen der Mail: ${String(error)}`);
+      setStatus(`Mail konnte nicht geöffnet werden: ${String(error)}`);
     } finally {
       setLoading(false);
     }
@@ -504,9 +481,9 @@ function App() {
       await detachOutlookItem(mailId);
       setWorkflow(null);
       setPipelineProgress(null);
-      setStatus("Workflow zurückgesetzt. Neue Anfrage bereit.");
+      setStatus("Neu gestartet.");
     } catch (error) {
-      setStatus(`Fehler beim Zurücksetzen: ${String(error)}`);
+      setStatus(`Neu starten fehlgeschlagen: ${String(error)}`);
     } finally {
       setLoading(false);
     }
@@ -519,9 +496,7 @@ function App() {
     Office.onReady((info: any) => {
       if (info.host !== Office.HostType.Outlook) {
         setIsOutlook(false);
-        setStatus(
-          `Nicht im Outlook-Host gestartet. info.host=${String(info.host)}`,
-        );
+        setStatus("Bitte in Outlook öffnen.");
         return;
       }
       setIsOutlook(true);
@@ -593,7 +568,7 @@ function App() {
     let cancelled = false;
     async function resumePolling() {
       try {
-        setStatus(`Pipeline-Status wird fortgesetzt (${currentReviewId})…`);
+        setStatus("Status wird aktualisiert…");
         // Build a minimal CreateReviewResponse for the existing poller.
         await awaitReviewCompletion(
           {
@@ -610,14 +585,10 @@ function App() {
         if (error instanceof ReviewNotFoundError) {
           setWorkflow(null);
           setPipelineProgress(null);
-          setStatus(
-            "Vorheriger Review existiert nicht mehr — Workflow zurückgesetzt.",
-          );
+          setStatus("Review nicht mehr vorhanden.");
           return;
         }
-        setStatus(
-          `Pipeline konnte nicht abgeschlossen werden: ${String(error)}`,
-        );
+        setStatus(`Pipeline fehlgeschlagen: ${String(error)}`);
       }
     }
     void resumePolling();
@@ -656,9 +627,7 @@ function App() {
           if (cancelled) return;
           setWorkflow(null);
           setPipelineProgress(null);
-          setStatus(
-            "Vorheriger Review existiert nicht mehr — Workflow zurückgesetzt.",
-          );
+          setStatus("Review nicht mehr vorhanden.");
           if (statusPollTimerRef.current !== null) {
             window.clearInterval(statusPollTimerRef.current);
             statusPollTimerRef.current = null;
@@ -724,7 +693,6 @@ function App() {
         {shouldShowStatusCard(status, false, false, false) && (
           <StatusCard status={status} loading={loading} />
         )}
-        {!batchCompleted && <OverviewLink />}
       </div>
     );
   }
@@ -744,11 +712,10 @@ function App() {
         onCreateDraftMail={handleCreateDraftMail}
         onResetWorkflow={handleResetWorkflow}
         onReloadMail={loadMail}
+        onOpenOverview={() => openUrl(REVIEW_OVERVIEW_URL)}
       />
 
       {showStatusCard && <StatusCard status={status} loading={loading} />}
-
-      <OverviewLink />
     </div>
   );
 }

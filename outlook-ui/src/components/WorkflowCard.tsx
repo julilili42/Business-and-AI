@@ -6,8 +6,8 @@
  * The "Angebotsmail erstellen" button now requires explicit approval.
  * It only enables in the `approved` workflow state, which is reached
  * after the user clicks "Freigeben" inside the Review-UI and the plugin
- * has polled the API once. In `review_opened` we show a disabled button
- * with a clear explanation so the user knows what to do next.
+ * has polled the API once. In `review_opened` the primary action sends
+ * the user back to the Review-UI so the required next step is clear.
  *
  * Visual states map onto the 3-step stepper as:
  *   new            → step 01 Anfrage
@@ -34,6 +34,7 @@ import {
   SendIcon,
   TrashIcon,
 } from "./Icons";
+import { PrivacyInlineHelp, SecondaryActions } from "./ActionHelpers";
 
 type WorkflowCardProps = {
   workflow: MailWorkflow | null;
@@ -46,6 +47,7 @@ type WorkflowCardProps = {
   onCreateDraftMail: () => void;
   onResetWorkflow: () => void;
   onReloadMail: () => void;
+  onOpenOverview: () => void;
 };
 
 function formatDate(iso?: string): string {
@@ -80,6 +82,25 @@ function StatusPill({ state }: { state: MailWorkflowState }) {
   );
 }
 
+function OverviewAction({
+  disabled,
+  onOpenOverview,
+}: {
+  disabled: boolean;
+  onOpenOverview: () => void;
+}) {
+  return (
+    <button
+      className="btn btn-ghost"
+      disabled={disabled}
+      onClick={onOpenOverview}
+    >
+      <ExternalIcon className="btn-icon" />
+      Quoting-Übersicht öffnen
+    </button>
+  );
+}
+
 export function WorkflowCard({
   workflow,
   snapshot,
@@ -91,6 +112,7 @@ export function WorkflowCard({
   onCreateDraftMail,
   onResetWorkflow,
   onReloadMail,
+  onOpenOverview,
 }: WorkflowCardProps) {
   const state = deriveState(workflow);
   const subject =
@@ -185,48 +207,52 @@ export function WorkflowCard({
           </div>
         )}
 
-        {state === "review_opened" && (
-          <div className="notice-banner notice-banner-warning">
-            Bitte zuerst in der Review-UI auf <strong>Freigeben</strong>{" "}
-            klicken. Sobald freigegeben, kann hier die Angebotsmail
-            erstellt werden.
-          </div>
-        )}
-
         <div className="actions">
           {state === "new" && (
             <>
-              <button
-                className="btn btn-primary"
-                disabled={!isOutlook || loading || !snapshot}
-                onClick={() => onCreateReview(true)}
-              >
-                <ExternalIcon className="btn-icon" />
-                Review erstellen &amp; öffnen
-              </button>
-              <button
-                className="btn btn-ghost"
-                disabled={!isOutlook || loading}
-                onClick={onReloadMail}
-              >
-                <RefreshIcon className="btn-icon" />
-                Mail neu laden
-              </button>
-              <p className="privacy-footnote">
-                Mail und Anhänge gehen zur Extraktion an Gemini bzw. Azure OpenAI.
-              </p>
+              <div className="primary-action-row">
+                <button
+                  className="btn btn-primary"
+                  disabled={!isOutlook || loading || !snapshot}
+                  onClick={() => onCreateReview(true)}
+                >
+                  <ExternalIcon className="btn-icon" />
+                  Review erstellen &amp; öffnen
+                </button>
+                <PrivacyInlineHelp />
+              </div>
+              <SecondaryActions>
+                <button
+                  className="btn btn-ghost"
+                  disabled={!isOutlook || loading}
+                  onClick={onReloadMail}
+                >
+                  <RefreshIcon className="btn-icon" />
+                  Mail neu laden
+                </button>
+                <OverviewAction
+                  disabled={loading}
+                  onOpenOverview={onOpenOverview}
+                />
+              </SecondaryActions>
             </>
           )}
 
           {state === "review_running" && (
-            <button
-              className="btn btn-ghost"
-              disabled={loading}
-              onClick={onResetWorkflow}
-            >
-              <TrashIcon className="btn-icon" />
-              Aus Ansicht entfernen
-            </button>
+            <SecondaryActions>
+              <OverviewAction
+                disabled={loading}
+                onOpenOverview={onOpenOverview}
+              />
+              <button
+                className="btn btn-ghost"
+                disabled={loading}
+                onClick={onResetWorkflow}
+              >
+                <TrashIcon className="btn-icon" />
+                Neu starten
+              </button>
+            </SecondaryActions>
           )}
 
           {state === "review_created" && (
@@ -239,40 +265,39 @@ export function WorkflowCard({
                 <ExternalIcon className="btn-icon" />
                 Review öffnen
               </button>
-              <button
-                className="btn btn-ghost"
-                disabled={loading}
-                onClick={onResetWorkflow}
-              >
-                <TrashIcon className="btn-icon" />
-                Aus Ansicht entfernen
-              </button>
+              <SecondaryActions>
+                <OverviewAction
+                  disabled={loading}
+                  onOpenOverview={onOpenOverview}
+                />
+                <button
+                  className="btn btn-ghost"
+                  disabled={loading}
+                  onClick={onResetWorkflow}
+                >
+                  <TrashIcon className="btn-icon" />
+                  Neu starten
+                </button>
+              </SecondaryActions>
             </>
           )}
 
           {state === "review_opened" && (
             <>
-              {/*
-                * Angebotsmail bleibt deaktiviert bis approved.
-                * Wir zeigen den Button trotzdem, damit der User sieht
-                * was als nächstes kommt — nur klicken kann er ihn nicht.
-                */}
               <button
                 className="btn btn-primary"
-                disabled
-                title="Erst freigeben in der Review-UI"
-              >
-                <SendIcon className="btn-icon" />
-                Angebotsmail erstellen
-              </button>
-              <button
-                className="btn btn-secondary"
                 disabled={loading}
                 onClick={onOpenReview}
               >
                 <ExternalIcon className="btn-icon" />
-                Review erneut öffnen
+                Review zur Freigabe öffnen
               </button>
+              <SecondaryActions>
+                <OverviewAction
+                  disabled={loading}
+                  onOpenOverview={onOpenOverview}
+                />
+              </SecondaryActions>
             </>
           )}
 
@@ -286,43 +311,55 @@ export function WorkflowCard({
                 <SendIcon className="btn-icon" />
                 Angebotsmail erstellen
               </button>
-              <button
-                className="btn btn-ghost"
-                disabled={loading}
-                onClick={onOpenReview}
-              >
-                <ExternalIcon className="btn-icon" />
-                Review öffnen
-              </button>
+              <SecondaryActions>
+                <button
+                  className="btn btn-ghost"
+                  disabled={loading}
+                  onClick={onOpenReview}
+                >
+                  <ExternalIcon className="btn-icon" />
+                  Review öffnen
+                </button>
+                <OverviewAction
+                  disabled={loading}
+                  onOpenOverview={onOpenOverview}
+                />
+              </SecondaryActions>
             </>
           )}
 
           {state === "quote_sent" && (
             <>
               <button
-                className="btn btn-secondary"
+                className="btn btn-primary"
                 disabled={loading}
                 onClick={onCreateDraftMail}
               >
                 <SendIcon className="btn-icon" />
                 Mail erneut erstellen
               </button>
-              <button
-                className="btn btn-ghost"
-                disabled={loading}
-                onClick={onOpenReview}
-              >
-                <ExternalIcon className="btn-icon" />
-                Review öffnen
-              </button>
-              <button
-                className="btn btn-danger-ghost"
-                disabled={loading}
-                onClick={onResetWorkflow}
-              >
-                <TrashIcon className="btn-icon" />
-                Workflow zurücksetzen
-              </button>
+              <SecondaryActions>
+                <button
+                  className="btn btn-ghost"
+                  disabled={loading}
+                  onClick={onOpenReview}
+                >
+                  <ExternalIcon className="btn-icon" />
+                  Review öffnen
+                </button>
+                <OverviewAction
+                  disabled={loading}
+                  onOpenOverview={onOpenOverview}
+                />
+                <button
+                  className="btn btn-danger-ghost"
+                  disabled={loading}
+                  onClick={onResetWorkflow}
+                >
+                  <TrashIcon className="btn-icon" />
+                  Neu starten
+                </button>
+              </SecondaryActions>
             </>
           )}
         </div>

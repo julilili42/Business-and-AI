@@ -1,4 +1,5 @@
 import type { SelectedMailSummary } from "../outlook/mailbox";
+import { PrivacyInlineHelp, SecondaryActions } from "./ActionHelpers";
 import {
   AlertIcon,
   CheckIcon,
@@ -51,7 +52,7 @@ function batchTitle({
 }): string {
   if (failed > 0) return "Batch prüfen";
   if (allCompleted) return "Reviews bereit";
-  if (loading || hasStarted) return "Reviews werden erstellt";
+  if (loading || hasStarted) return "Reviews laufen";
   return "Batch vorbereiten";
 }
 
@@ -76,7 +77,7 @@ function batchSubtitle({
 }): string | null {
   if (failed > 0) return `${failed} fehlgeschlagen`;
   if (allCompleted) return null;
-  if (hasStarted) return "Pipelines laufen";
+  if (hasStarted) return "Reviews laufen";
   return selectionLabel;
 }
 
@@ -182,27 +183,42 @@ export function BatchWorkflowCard({
               Übersicht öffnen
             </button>
           ) : (
-            <button
-              className="btn btn-primary"
-              disabled={!canCreate}
-              onClick={onCreateBatch}
-            >
-              <SparkIcon className="btn-icon" />
-              {hasStarted
-                ? loading
-                  ? "Reviews werden erstellt"
-                  : "Erneut versuchen"
-                : `${total} Reviews erstellen`}
-            </button>
+            <div className="primary-action-row">
+              <button
+                className="btn btn-primary"
+                disabled={!canCreate}
+                onClick={onCreateBatch}
+              >
+                <SparkIcon className="btn-icon" />
+                {hasStarted
+                  ? loading
+                    ? "Reviews laufen"
+                    : "Erneut versuchen"
+                  : `${total} Reviews erstellen`}
+              </button>
+              <PrivacyInlineHelp />
+            </div>
           )}
-          <button
-            className="btn btn-ghost"
-            disabled={loading}
-            onClick={onReloadSelection}
-          >
-            <RefreshIcon className="btn-icon" />
-            Auswahl aktualisieren
-          </button>
+          <SecondaryActions>
+            {!allCompleted && (
+              <button
+                className="btn btn-ghost"
+                disabled={loading}
+                onClick={onOpenOverview}
+              >
+                <ExternalIcon className="btn-icon" />
+                Quoting-Übersicht öffnen
+              </button>
+            )}
+            <button
+              className="btn btn-ghost"
+              disabled={loading}
+              onClick={onReloadSelection}
+            >
+              <RefreshIcon className="btn-icon" />
+              Auswahl aktualisieren
+            </button>
+          </SecondaryActions>
         </div>
       </div>
     </section>

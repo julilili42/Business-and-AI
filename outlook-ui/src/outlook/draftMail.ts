@@ -83,7 +83,7 @@ export async function createDraftMail(
       },
     ],
   });
-  setStatus(`Angebotsmail mit aktueller PDF geöffnet (${result.review_id})`);
+  setStatus("Angebotsmail geöffnet.");
 }
 
 export function openUrl(url: string) {
