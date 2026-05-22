@@ -1,0 +1,65 @@
+[
+  {
+    "case_name": "smoke_fastpath_001",
+    "success": true,
+    "duration_s": 0.25432705879211426,
+    "extraction_path": "fast_path",
+    "extraction": {
+      "position_count_correct": true,
+      "expected_position_count": 1,
+      "actual_position_count": 1,
+      "per_field_recall": {
+        "kunde_email": 1.0,
+        "artikelnummer": 1.0,
+        "menge": 1.0,
+        "einheit": 1.0
+      },
+      "per_field_counts": {
+        "kunde_email": [
+          1,
+          1
+        ],
+        "artikelnummer": [
+          1,
+          1
+        ],
+        "menge": [
+          1,
+          1
+        ],
+        "einheit": [
+          1,
+          1
+        ]
+      },
+      "missing_positions": [],
+      "extra_positions": [],
+      "mismatches": [],
+      "overall_f1": 1.0
+    },
+    "matching": {
+      "top1_accuracy": 1.0,
+      "total": 1,
+      "correct": 1,
+      "status_violations": [],
+      "per_position": [
+        {
+          "pos_nr": 10,
+          "expected": "00002900KS0009",
+          "actual": "00002900KS0009",
+          "status": "exact",
+          "score": 1.0,
+          "correct": true
+        }
+      ]
+    },
+    "pricing": null,
+    "rendering": {
+      "file_ok": true,
+      "size_bytes": 55451,
+      "page_count": 1,
+      "issue": null
+    },
+    "threshold_failures": []
+  }
+]

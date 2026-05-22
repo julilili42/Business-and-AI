@@ -62,10 +62,13 @@ select = ["E", "F", "I", "W", "B", "UP"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "testing"]
 python_files = ["test_*.py"]
-addopts = "-v --tb=short"
-pythonpath = ["src"]
+addopts = "-v --tb=short -m 'not eval'"
+pythonpath = ["src", "."]
+markers = [
+    "eval: end-to-end evaluation cases under testing/ (slow, may call LLM)",
+]
 
 [tool.mypy]
 python_version = "3.10"
