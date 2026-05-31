@@ -7,7 +7,6 @@ import { FormField } from "@/shared/components/ui/FormField";
 import { Input } from "@/shared/components/ui/input";
 import { DatePopover } from "@/shared/components/ui/DatePopover";
 import { useReviewUiStore } from "@/features/review/stores/reviewUiStore";
-import { useDelayedVisible } from "@/shared/hooks/useDelayedVisible";
 import { cn } from "@/shared/lib/cn";
 import type { Anfrage, Evidence } from "@/shared/schemas/anfrage";
 import { Button } from "@/shared/components/ui/button";
@@ -15,6 +14,7 @@ import type { SourceNavigationTarget } from "@/shared/types/sourceNavigation";
 
 import { useSaveAndRegenerate } from "../../hooks/useReviewMutations";
 import { ChangedFieldsIndicator } from "../../components/ChangedFieldsIndicator";
+import { SaveStatus } from "../../components/SaveStatus";
 import { customerFormSchema, type CustomerFormValues } from "./schemas";
 
 interface CustomerFormProps {
@@ -43,7 +43,6 @@ export function CustomerForm({
   const refreshChangedFields = useReviewUiStore((s) => s.refreshChangedFields);
   const recordUndoSnapshot = useReviewUiStore((s) => s.recordUndoSnapshot);
   const saveAndRegenerate = useSaveAndRegenerate(reviewId);
-  const showSaveStatus = useDelayedVisible(saveAndRegenerate.isPending);
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
@@ -105,11 +104,11 @@ export function CustomerForm({
           </h2>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {showChangeIndicator && <ChangedFieldsIndicator />}
-            {showSaveStatus && (
-              <span className="text-xs font-medium text-muted-foreground" role="status">
-                Änderungen werden gespeichert…
-              </span>
-            )}
+            <SaveStatus
+              pending={saveAndRegenerate.isPending}
+              isError={saveAndRegenerate.isError}
+              isSuccess={saveAndRegenerate.isSuccess}
+            />
           </div>
         </div>
         <div className="rounded-lg border border-border bg-surface p-5 shadow-card">

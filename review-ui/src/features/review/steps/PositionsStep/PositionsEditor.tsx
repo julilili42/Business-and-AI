@@ -6,7 +6,6 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { Button } from "@/shared/components/ui/button";
 import { ShortcutHint } from "@/shared/components/ui/ShortcutHint";
 import { useReviewUiStore } from "@/features/review/stores/reviewUiStore";
-import { useDelayedVisible } from "@/shared/hooks/useDelayedVisible";
 import type { Anfrage, Position } from "@/shared/schemas/anfrage";
 import type { SourceNavigationTarget } from "@/shared/types/sourceNavigation";
 import type { MatchResult } from "@/shared/schemas/matchResult";
@@ -18,6 +17,7 @@ import type {
 
 import { useSaveAndRegenerate } from "../../hooks/useReviewMutations";
 import { ChangedFieldsIndicator } from "../../components/ChangedFieldsIndicator";
+import { SaveStatus } from "../../components/SaveStatus";
 import { MatchSummary } from "./MatchSummary";
 import { PositionCard } from "./PositionCard";
 import { upsertOverride } from "./upsertOverride";
@@ -71,7 +71,6 @@ export function PositionsEditor({
   const refreshChangedFields = useReviewUiStore((s) => s.refreshChangedFields);
   const recordUndoSnapshot = useReviewUiStore((s) => s.recordUndoSnapshot);
   const saveAndRegenerate = useSaveAndRegenerate(reviewId);
-  const showSaveStatus = useDelayedVisible(saveAndRegenerate.isPending);
 
   // Track which pos_nrs were just added in this session, so we can
   // auto-expand them and visually distinguish them.
@@ -271,16 +270,13 @@ export function PositionsEditor({
 
         <div className="flex flex-wrap items-center justify-end gap-2">
           {showChangeIndicator && <ChangedFieldsIndicator />}
-          {showSaveStatus && (
-            <span className="text-xs font-medium text-muted-foreground" role="status">
-              Änderungen werden gespeichert…
-            </span>
-          )}
-          {saveAndRegenerate.isError && (
-            <span className="text-xs font-semibold text-danger">
-              PDF-Neuberechnung fehlgeschlagen — Daten wurden gespeichert. Bitte erneut versuchen.
-            </span>
-          )}
+          <SaveStatus
+            pending={saveAndRegenerate.isPending}
+            isError={saveAndRegenerate.isError}
+            isSuccess={saveAndRegenerate.isSuccess}
+            errorText="PDF-Neuberechnung fehlgeschlagen — Daten wurden gespeichert. Bitte erneut versuchen."
+            savedText="Alle Änderungen gespeichert"
+          />
         </div>
       </header>
 

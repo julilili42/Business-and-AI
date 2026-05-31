@@ -736,6 +736,12 @@ function App() {
       if (now - lastRefreshAt < 500) return;
       lastRefreshAt = now;
 
+      // A pipeline poll is already keeping this review fresh (and also drives
+      // the progress bar). A second setWorkflow from a focus event would only
+      // race it — the same class of bug the openWhenReadyRef fix addressed.
+      // Let the active poller own the state; it updates within its interval.
+      if (pollingReviewIdRef.current) return;
+
       if (mailId && workflow?.reviewId) {
         void refreshServerWorkflow(mailId);
         return;
