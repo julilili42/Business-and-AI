@@ -45,6 +45,20 @@ const mailMetaSchema = z.object({
     .default([]),
 });
 
+export interface Escalation {
+  escalated: boolean;
+  reason: string;
+  actor: string | null;
+  at: string;
+}
+
+export interface OutgoingMailAttachment {
+  name: string;
+  contentType?: string | null;
+  size?: number | null;
+  url: string;
+}
+
 export interface ReviewDetail {
   review_id: string;
   created_at: string | null;
@@ -56,7 +70,9 @@ export interface ReviewDetail {
   mail: MailMeta;
   has_draft_pdf: boolean;
   has_final_pdf: boolean;
+  mail_attachments: OutgoingMailAttachment[];
   requirements_acknowledged: number[];
+  escalation: Escalation | null;
 }
 
 export interface PdfHighlightArea {
@@ -93,7 +109,26 @@ const reviewDetailSchema = z.object({
   mail: mailMetaSchema,
   has_draft_pdf: z.boolean(),
   has_final_pdf: z.boolean(),
+  mail_attachments: z
+    .array(
+      z.object({
+        name: z.string(),
+        contentType: z.string().nullable().optional(),
+        size: z.number().nullable().optional(),
+        url: z.string(),
+      }),
+    )
+    .default([]),
   requirements_acknowledged: z.array(z.number().int()).default([]),
+  escalation: z
+    .object({
+      escalated: z.boolean(),
+      reason: z.string(),
+      actor: z.string().nullable(),
+      at: z.string(),
+    })
+    .nullable()
+    .default(null),
 });
 
 const pdfHighlightResponseSchema = z.object({
@@ -128,8 +163,12 @@ export const reviewPath = (reviewId: string) => {
     overrides: `${base}/overrides`,
     regenerate: `${base}/regenerate`,
     finalize: `${base}/finalize`,
+    escalate: `${base}/escalate`,
     reset: `${base}/reset`,
     requirementsAck: `${base}/requirements-ack`,
+    mailAttachments: `${base}/mail-attachments`,
+    mailAttachment: (fileName: string) =>
+      `${base}/mail-attachments/${encodeURIComponent(fileName)}`,
     pdfHighlight: (fileName: string) =>
       `${base}/attachment/${encodeURIComponent(fileName)}/pdf/highlight`,
   };
@@ -172,8 +211,13 @@ export const reviewsApi = {
     return z.array(manualOverrideSchema).parse(data);
   },
 
-  regenerate: async (reviewId: string): Promise<Quotation> => {
-    const data = await apiClient.post<unknown>(reviewPath(reviewId).regenerate);
+  regenerate: async (
+    reviewId: string,
+    buildPdf = true,
+  ): Promise<Quotation> => {
+    const data = await apiClient.post<unknown>(
+      `${reviewPath(reviewId).regenerate}?build_pdf=${buildPdf}`,
+    );
     return quotationSchema.parse(data);
   },
 
@@ -199,6 +243,21 @@ export const reviewsApi = {
     await apiClient.post(reviewPath(reviewId).reset);
   },
 
+  escalate: async (
+    reviewId: string,
+    reason: string,
+    actor?: string,
+  ): Promise<void> => {
+    await apiClient.post(reviewPath(reviewId).escalate, {
+      reason,
+      ...(actor ? { actor } : {}),
+    });
+  },
+
+  clearEscalation: async (reviewId: string): Promise<void> => {
+    await apiClient.delete(reviewPath(reviewId).escalate);
+  },
+
   acknowledgeRequirements: async (
     reviewId: string,
     indices: number[],
@@ -210,6 +269,31 @@ export const reviewsApi = {
     return z
       .object({ indices: z.array(z.number().int()) })
       .parse(data).indices;
+  },
+
+  uploadMailAttachment: async (
+    reviewId: string,
+    file: File,
+  ): Promise<OutgoingMailAttachment> => {
+    const form = new FormData();
+    form.append("file", file);
+    const data = await apiClient.post<unknown>(
+      reviewPath(reviewId).mailAttachments,
+      undefined,
+      { body: form },
+    );
+    return z
+      .object({
+        name: z.string(),
+        contentType: z.string().nullable().optional(),
+        size: z.number().nullable().optional(),
+        url: z.string(),
+      })
+      .parse(data);
+  },
+
+  deleteMailAttachment: async (reviewId: string, fileName: string): Promise<void> => {
+    await apiClient.delete(reviewPath(reviewId).mailAttachment(fileName));
   },
 
   pdfHighlight: async (

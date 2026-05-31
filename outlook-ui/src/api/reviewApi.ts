@@ -131,6 +131,15 @@ export async function getOutlookItemStatus(
   return JSON.parse(text) as import("../serverWorkflow").OutlookItemStatus;
 }
 
+export async function cancelReview(reviewId: string): Promise<void> {
+  const url = `${REVIEW_API_URL}/${reviewId}/cancel`;
+  const response = await fetch(url, { method: "POST" });
+  if (!response.ok && response.status !== 404) {
+    const text = await response.text();
+    throw new Error(`cancel failed (${response.status}): ${text}`);
+  }
+}
+
 export async function markReviewOpened(reviewId: string): Promise<void> {
   const url = `${REVIEW_API_URL}/${reviewId}/mark-opened`;
   const response = await fetch(url, { method: "POST" });
@@ -170,7 +179,16 @@ export type MailTemplateSettings = {
   email_body_template: string;
   company_name: string;
   body_source: "template" | "llm";
+  mail_attachments: Array<{
+    name: string;
+    url: string;
+  }>;
 };
+
+function absoluteApiUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+}
 
 function extractEmailAddress(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -188,6 +206,7 @@ export async function getMailSettings(reviewId: string): Promise<{ kundenFirma: 
 
   let kundenFirma: string | null = null;
   let recipientEmail: string | null = null;
+  let mailAttachments: MailTemplateSettings["mail_attachments"] = [];
   if (detailRes.ok) {
     try {
       const detail = JSON.parse(await detailRes.text());
@@ -195,6 +214,17 @@ export async function getMailSettings(reviewId: string): Promise<{ kundenFirma: 
       recipientEmail =
         extractEmailAddress(detail?.anfrage?.kunde_email) ??
         extractEmailAddress(detail?.mail?.from);
+      mailAttachments = Array.isArray(detail?.mail_attachments)
+        ? detail.mail_attachments
+            .filter((item: unknown) => {
+              const att = item as { name?: unknown; url?: unknown };
+              return typeof att.name === "string" && typeof att.url === "string";
+            })
+            .map((item: { name: string; url: string }) => ({
+              name: item.name,
+              url: absoluteApiUrl(item.url),
+            }))
+        : [];
     } catch { /* ignore */ }
   }
 
@@ -203,6 +233,7 @@ export async function getMailSettings(reviewId: string): Promise<{ kundenFirma: 
     email_body_template: "<p>Sehr geehrte Damen und Herren,</p><p>vielen Dank für Ihre Anfrage. Anbei erhalten Sie unser Angebot.</p><p>Mit freundlichen Grüßen<br/>[Absender]</p>",
     company_name: "",
     body_source: "template",
+    mail_attachments: mailAttachments,
   };
 
   let useLlmBody = false;
@@ -253,6 +284,11 @@ export async function pollReviewUntilComplete(
 
     const progress = await getReviewStatus(review);
     onProgress?.(progress);
+
+    if (progress.status === "cancelled") {
+      // User stopped the run — terminal, but not an error.
+      return { ...review, status: "cancelled", progress };
+    }
 
     if (progress.status === "failed") {
       throw new Error(progress.error || "Pipeline failed");

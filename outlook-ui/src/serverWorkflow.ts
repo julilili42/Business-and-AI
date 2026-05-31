@@ -96,10 +96,11 @@ export function deriveWorkflowState(
   if (status.approval_state === "ready_to_send") return "quote_sent";
   if (status.approval_state === "approved") return "approved";
   if (status.progress_status === "running") return "review_running";
-  // Pipeline failures are surfaced by the WorkflowCard's progress banner;
-  // for the high-level state we keep the user in "review_running" so they
-  // see the error context and can reset.
+  // Pipeline failures and user-initiated stops are surfaced by the
+  // WorkflowCard's progress banner; for the high-level state we keep the user
+  // in "review_running" so they see the context and can stop/restart.
   if (status.progress_status === "failed") return "review_running";
+  if (status.progress_status === "cancelled") return "review_running";
   if (status.opened_at) return "review_opened";
   return "review_created";
 }

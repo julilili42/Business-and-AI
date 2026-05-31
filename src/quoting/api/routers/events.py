@@ -58,7 +58,7 @@ async def stream_review_events(review_id: str) -> StreamingResponse:
         if progress and progress.get("status") == "completed":
             yield _sse_frame("done", progress)
             return
-        if progress and progress.get("status") == "failed":
+        if progress and progress.get("status") in {"failed", "cancelled"}:
             yield _sse_frame("error", progress)
             return
 

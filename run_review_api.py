@@ -27,8 +27,22 @@ load_dotenv(ROOT / ".env")
 PROCESSES: list[subprocess.Popen] = []
 
 
+def launcher_prefix_enabled() -> bool:
+    return os.getenv("QUOTING_LAUNCHER_PREFIX", "1") != "0"
+
+
+def print_process_line(name: str, line: str) -> None:
+    if launcher_prefix_enabled():
+        print(f"[{name}] {line}", end="", flush=True)
+        return
+    print(line, end="", flush=True)
+
+
 def start_process(name: str, cmd: list[str]) -> subprocess.Popen:
-    print(f"[{name}] Starting: {' '.join(cmd)}", flush=True)
+    if launcher_prefix_enabled():
+        print(f"[{name}] Starting: {' '.join(cmd)}", flush=True)
+    else:
+        print(f"Starting: {' '.join(cmd)}", flush=True)
 
     proc = subprocess.Popen(
         cmd,
@@ -44,7 +58,7 @@ def start_process(name: str, cmd: list[str]) -> subprocess.Popen:
     def pump() -> None:
         assert proc.stdout is not None
         for line in proc.stdout:
-            print(f"[{name}] {line}", end="", flush=True)
+            print_process_line(name, line)
 
     threading.Thread(target=pump, daemon=True).start()
     return proc

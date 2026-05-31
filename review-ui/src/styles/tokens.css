@@ -18,7 +18,7 @@
 
   --border: 220 13% 91%;
   --input: 220 13% 91%;
-  --ring: 355 95% 46%;
+  --ring: 210 92% 45%;         /* focus ring — blue, not brand red, so a focused field never reads as an error */
 
   --brand: 355 95% 46%;        /* #e30613 */
   --brand-dark: 354 100% 36%;  /* #b8000b */
@@ -40,4 +40,44 @@
   --danger-soft: 0 86% 97%;
 
   --radius: 0.75rem;
+}
+
+/*
+ * Dark theme. Same token names, re-pointed for a dark surface. "-soft"
+ * colors flip to dark tints (used as backgrounds behind their bright solid
+ * counterpart as text). Toggled by adding `.dark` to <html>; the no-flash
+ * boot script lives in index.html.
+ */
+.dark {
+  --background: 222 18% 11%;
+  --foreground: 210 17% 92%;
+
+  --surface: 222 16% 14%;
+  --surface-sunk: 222 16% 12%;
+
+  --muted: 217 16% 22%;
+  --muted-foreground: 218 13% 65%;
+
+  --border: 220 12% 24%;
+  --input: 220 12% 24%;
+  --ring: 210 90% 62%;
+
+  --brand: 355 88% 63%;
+  --brand-dark: 355 80% 54%;
+  --brand-soft: 356 38% 19%;
+
+  --ek-blue: 210 80% 68%;
+  --ek-blue-soft: 211 42% 20%;
+
+  --success: 158 62% 50%;
+  --success-soft: 158 40% 15%;
+
+  --warning: 36 88% 58%;
+  --warning-soft: 34 48% 16%;
+
+  --info: 213 82% 68%;
+  --info-soft: 215 45% 20%;
+
+  --danger: 0 78% 65%;
+  --danger-soft: 0 42% 18%;
 }

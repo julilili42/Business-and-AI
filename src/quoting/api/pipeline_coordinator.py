@@ -70,6 +70,9 @@ class PipelineCoordinator:
         step_method = getattr(self.handlers, step)
 
         def handler(job) -> None:
+            # User stopped the run before this step was picked up — do nothing.
+            if self._is_cancelled(job.review_id):
+                return
             try:
                 step_method(job.review_id)
             except Exception as exc:
@@ -86,7 +89,15 @@ class PipelineCoordinator:
 
         return handler
 
+    def _is_cancelled(self, review_id: str) -> bool:
+        progress = self.progress.read(review_id)
+        return bool(progress and progress.get("status") == "cancelled")
+
     def _after_step_completed(self, review_id: str, completed_step: str) -> None:
+        # Stopped while this step was running → don't enqueue the next one.
+        if self._is_cancelled(review_id):
+            log.info("Pipeline for %s was cancelled — not enqueuing next step", review_id)
+            return
         try:
             idx = PIPELINE_STEPS.index(completed_step)
         except ValueError:

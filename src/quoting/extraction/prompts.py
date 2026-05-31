@@ -28,14 +28,18 @@ EXTRACTION RULES
 10. Extract `lieferzeit` and `lieferwerk` per position if the RFQ specifies
    them for that line. Do not copy one position's values to another unless the
    document clearly states that they apply to all positions.
-11. confidence:
+11. Extract packaging and weights per position when explicit:
+   `verpackungsart`, `gewicht_stueck_kg`, `gewicht_netto_kg`,
+   `gewicht_brutto_kg`. If the RFQ only asks us to provide packaging or
+   gross/net weight later, record that as an `anforderung` instead.
+12. confidence:
    - high: value appears verbatim, unambiguous
    - medium: inferred from context or partially legible
    - low: guessed, unclear, or OCR-questionable
-12. source_quote: literal snippet (<=120 chars) proving where you got the
+13. source_quote: literal snippet (<=120 chars) proving where you got the
     article number + quantity from. Required for audit.
-13. List anything suspicious in `unsicherheiten` (open questions for Sales).
-14. Evidence fields per position (fill when determinable, leave null otherwise):
+14. List anything suspicious in `unsicherheiten` (open questions for Sales).
+15. Evidence fields per position (fill when determinable, leave null otherwise):
     - source_file: filename as shown in the section header (e.g. "Anfrage.pdf"),
       or "mail" if the data came from the mail body.
     - source_page: 1-indexed page number for PDF sources (use only when the PDF
@@ -44,17 +48,17 @@ EXTRACTION RULES
     - Vision inputs are labelled "Image N: PDF <filename>, page P of M" or
       "Image N: image file <filename>". Use these labels to map image evidence
       to source_file and source_page.
-15. header_evidence: for each extracted Anfrage header field (e.g. "kunde_firma",
+16. header_evidence: for each extracted Anfrage header field (e.g. "kunde_firma",
     "belegnummer", "datum"), provide an Evidence object with the same fields as
     above. Only include fields where you found clear evidence; omit the rest.
-16. If PDF TEXT sections are present, use them as the primary source for exact
+17. If PDF TEXT sections are present, use them as the primary source for exact
     values such as email addresses, dates, customer numbers, RFQ numbers,
     article numbers and quantities. Use images as fallback for layout, scans,
     illegible text, or values not present in the text layer.
-17. LOCAL CANDIDATE HINTS are non-authoritative. Prefer them only when they
+18. LOCAL CANDIDATE HINTS are non-authoritative. Prefer them only when they
     are supported by the source text or image evidence. Never copy a candidate
     value that contradicts the source.
-18. `anforderungen`: collect explicit RFQ-side requirements that go BEYOND the
+19. `anforderungen`: collect explicit RFQ-side requirements that go BEYOND the
     standard position/header fields. These are instructions Sales must honor
     when sending the quote (drawings, certifications, packaging, delivery
     constraints, deadlines, etc.). Each item:
@@ -70,8 +74,9 @@ EXTRACTION RULES
         otherwise null.
       - source_quote: literal snippet (<=120 chars) proving the requirement.
     Do NOT invent. Do NOT duplicate fields that already belong on the position
-    (e.g. `lieferzeit`, `ist_zertifikat` for certificate POSITIONS — those
-    stay where they belong; only RFQ-side handling notes go here).
+    (e.g. `lieferzeit`, `verpackungsart`, weights, `ist_zertifikat` for
+    certificate POSITIONS — those stay where they belong; only RFQ-side
+    handling notes go here).
 
 OUTPUT
 ======

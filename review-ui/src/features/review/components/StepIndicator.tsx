@@ -45,7 +45,7 @@ export function StepIndicator() {
                 isActive
                   ? "bg-brand"
                   : isDone
-                    ? "bg-success"
+                    ? "bg-ek-blue"
                     : "bg-border",
               )}
               aria-hidden="true"
@@ -56,7 +56,7 @@ export function StepIndicator() {
                 isActive
                   ? "text-brand"
                   : isDone
-                    ? "text-success"
+                    ? "text-ek-blue"
                     : "text-muted-foreground/60",
               )}
             >

@@ -48,24 +48,24 @@ export function MailVorlagePage() {
 
   if (isLoading) {
     return (
-      <PageContainer wide>
+      <PageContainer>
         <LoadingState label="Lade Vorlagen…" />
       </PageContainer>
     );
   }
   if (isError || !data) {
     return (
-      <PageContainer wide>
+      <PageContainer>
         <ErrorState error={error ?? "Vorlagen konnten nicht geladen werden."} />
       </PageContainer>
     );
   }
 
   return (
-    <PageContainer wide>
+    <PageContainer>
       <header className="mb-8">
         <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
-          E-Mail & Dateiname<span className="text-brand">.</span>
+          E-Mail & Dateiname<span className="text-ek-blue">.</span>
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
           Vorlage für ausgehende Angebotsmail und Name der finalen PDF.
@@ -328,17 +328,17 @@ function LlmToggle({
         "group inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         checked
-          ? "bg-brand-soft text-brand"
+          ? "bg-ek-blue-soft text-ek-blue"
           : "bg-surface-sunk text-muted-foreground hover:text-foreground",
       )}
     >
-      <Sparkles className={cn("h-3 w-3", checked && "text-brand")} />
+      <Sparkles className={cn("h-3 w-3", checked && "text-ek-blue")} />
       <span>KI-Begleittext</span>
       <span
         aria-hidden="true"
         className={cn(
           "relative inline-block h-3.5 w-6 rounded-full transition-colors",
-          checked ? "bg-brand" : "bg-border",
+          checked ? "bg-ek-blue" : "bg-border",
         )}
       >
         <span
@@ -360,7 +360,7 @@ function LlmStyleHintField({
   styleHintLength: number;
 }) {
   return (
-    <div className="rounded-md border border-brand/20 bg-brand-soft/30 p-3 space-y-2">
+    <div className="rounded-md border border-ek-blue/20 bg-ek-blue-soft/30 p-3 space-y-2">
       <p className="flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground">
         <Info className="mt-0.5 h-3 w-3 shrink-0" />
         Text wird beim Senden für jede Anfrage individuell generiert (Deutsch oder Englisch).
@@ -473,7 +473,7 @@ function SectionCard({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-soft text-brand">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-ek-blue-soft text-ek-blue">
               {icon}
             </span>
             <div>

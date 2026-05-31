@@ -9,8 +9,8 @@ States
                         without the red AI-warning banner.
 - ``ready_to_send``   — final PDF has been delivered to Outlook for sending
 
-Transitions are linear; you can move backwards by resetting (which clears
-the approval and restarts at ``draft_generated``).
+Transitions are mostly linear; moving back to ``reviewed`` revokes the
+approval so the user can adjust the review and approve again.
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ VALID_TRANSITIONS: dict[ApprovalState, set[ApprovalState]] = {
     "draft_generated": {"reviewed", "approved"},
     "reviewed":        {"approved", "draft_generated"},
     "approved":        {"ready_to_send", "reviewed"},
-    "ready_to_send":   {"approved"},
+    "ready_to_send":   {"approved", "reviewed"},
 }
 
 
@@ -114,6 +114,11 @@ class ApprovalStore:
         elif target == "ready_to_send":
             record.sent_at = _now_iso()
         elif target == "reviewed":
+            record.approved_by = None
+            record.approved_at = None
+            record.sent_at = None
+            record.final_pdf_path = None
+            record.warning_acknowledged = False
             record.exception_reason = None
         if final_pdf_path is not None:
             record.final_pdf_path = final_pdf_path

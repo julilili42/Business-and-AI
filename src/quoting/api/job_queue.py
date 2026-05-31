@@ -178,6 +178,20 @@ class JobQueue:
             )
             return target
 
+    def cancel_pending(self, review_id: str) -> int:
+        """Delete all not-yet-started jobs for a review; return how many.
+
+        Running jobs are left alone — the worker can't be interrupted
+        mid-handler. The coordinator's cancelled-check stops it from
+        enqueueing the next step once the current one finishes.
+        """
+        with self.repo.connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM jobs WHERE review_id = ? AND status = 'pending'",
+                (review_id,),
+            )
+            return cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+
     def get(self, job_id: int) -> Job | None:
         with self.repo.connect() as conn:
             row = conn.execute(

@@ -66,3 +66,25 @@ def test_scan_reviews_uses_in_progress_for_review_without_pdf(sqlite_repo):
     [summary] = scan_reviews()
 
     assert summary.status == "in_arbeit"
+
+
+def test_scan_reviews_includes_manual_clarification(sqlite_repo):
+    _seed_review(sqlite_repo)
+    sqlite_repo.save_escalation(
+        "review-1",
+        {
+            "escalated": True,
+            "reason": "Zeichnung muss geprüft werden",
+            "actor": "Tester",
+            "at": "2026-05-29T10:00:00Z",
+        },
+    )
+
+    [summary] = scan_reviews()
+
+    assert summary.escalation == {
+        "escalated": True,
+        "reason": "Zeichnung muss geprüft werden",
+        "actor": "Tester",
+        "at": "2026-05-29T10:00:00Z",
+    }

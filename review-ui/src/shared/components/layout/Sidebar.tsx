@@ -5,7 +5,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 
 import { cn } from "@/shared/lib/cn";
 
-const MAIN_NAV = [
+export const MAIN_NAV = [
   { to: "/", label: "Übersicht", icon: LayoutDashboard, end: true },
   { to: "/stammdaten", label: "Stammdaten", icon: Database, end: false },
   { to: "/status", label: "Status", icon: Activity, end: false },
@@ -21,6 +21,39 @@ const SHORTCUTS = [
   { keys: ["Alt", "F"], label: "Vollbild" },
   { keys: ["Esc"], label: "Vollbild verlassen" },
 ];
+
+/**
+ * The main navigation links. Shared between the desktop sidebar and the
+ * mobile drawer; `onNavigate` lets the drawer close itself on selection.
+ */
+export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <>
+      {MAIN_NAV.map((item) => {
+        const Icon = item.icon;
+        return (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+                isActive
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )
+            }
+          >
+            <Icon className="h-4 w-4" aria-hidden="true" />
+            {item.label}
+          </NavLink>
+        );
+      })}
+    </>
+  );
+}
 
 interface SidebarProps {
   /** Optional slot for actions specific to the active page (e.g. reset). */
@@ -45,27 +78,7 @@ export function Sidebar({ pageActions }: SidebarProps) {
 
       <nav className="flex-1 space-y-1 px-3">
         <div className="section-label mb-2 px-3">Navigation</div>
-        {MAIN_NAV.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
-                  isActive
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )
-              }
-            >
-              <Icon className="h-4 w-4" aria-hidden="true" />
-              {item.label}
-            </NavLink>
-          );
-        })}
+        <NavLinks />
       </nav>
 
       {pageActions && (

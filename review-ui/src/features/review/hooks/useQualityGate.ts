@@ -153,8 +153,8 @@ function evaluate(detail: ReviewDetail | undefined): QualityGateResult {
       id: "requirements:unacknowledged",
       severity: "blocker",
       step: "approval",
-      title: "Angebotsanforderungen nicht vollständig bestätigt",
-      description: "Bitte die Checkliste „Zu berücksichtigen im Angebot“ vollständig bestätigen.",
+      title: "Anforderungen bestätigen",
+      description: "Bitte die Checkliste „Angebotsanforderungen“ vollständig bestätigen.",
     });
   }
 
@@ -281,9 +281,9 @@ function shorten(value: string, limit = 120): string {
 
 function deliveryTitle(deliveries: Array<{ posNr: number }>): string {
   if (deliveries.length === 1) {
-    return `Pos ${deliveries[0].posNr}: Liefertermin liegt in der Vergangenheit`;
+    return `Pos ${deliveries[0].posNr}: Liefertermin vergangen`;
   }
-  return `${deliveries.length} Positionen mit vergangenem Liefertermin`;
+  return `${deliveries.length} vergangene Liefertermine`;
 }
 
 function deliverySummary(

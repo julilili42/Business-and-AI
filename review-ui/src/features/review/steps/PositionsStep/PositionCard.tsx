@@ -191,42 +191,44 @@ export function PositionCard({
             "group flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left text-sm font-semibold",
           )}
         >
-          <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="grid min-w-0 flex-1 grid-cols-[max-content_max-content_max-content_minmax(0,1fr)] items-center gap-x-3">
             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Pos {position.pos_nr}
             </span>
-            {anforderungen.length > 0 && (
-              <span
-                className="inline-flex shrink-0 items-center gap-1 rounded border border-warning/30 bg-warning-soft px-1.5 py-0.5 text-[10px] font-medium text-warning"
-                title={anforderungen.map((a) => a.text).join("\n")}
-              >
-                <AlertCircle className="h-3 w-3" aria-hidden="true" />
-                {anforderungen.length === 1
-                  ? "1 Hinweis"
-                  : `${anforderungen.length} Hinweise`}
-              </span>
-            )}
-            {position.confidence === "low" && (
-              <span
-                className="shrink-0 rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-                title={CONFIDENCE_EXPLANATION}
-              >
-                unsichere Extraktion
-              </span>
-            )}
             <span
               className={cn(
-                "max-w-[13rem] shrink-0 truncate rounded-md border px-2 py-1 font-mono text-[13px] font-bold tracking-tight",
+                "max-w-[13rem] truncate rounded-md border px-2 py-1 font-mono text-[13px] font-bold tracking-tight",
                 articleTone,
               )}
             >
               {articleNumber}
             </span>
-            <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-              {position.bezeichnung || "Keine Bezeichnung"}
-            </span>
             <span className="shrink-0 text-xs font-medium text-muted-foreground">
               {quantityMeta}
+            </span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                {position.bezeichnung || "Keine Bezeichnung"}
+              </span>
+              {anforderungen.length > 0 && (
+                <span
+                  className="inline-flex shrink-0 items-center gap-1 rounded border border-warning/30 bg-warning-soft px-1.5 py-0.5 text-[10px] font-medium text-warning"
+                  title={anforderungen.map((a) => a.text).join("\n")}
+                >
+                  <AlertCircle className="h-3 w-3" aria-hidden="true" />
+                  {anforderungen.length === 1
+                    ? "1 Hinweis"
+                    : `${anforderungen.length} Hinweise`}
+                </span>
+              )}
+              {position.confidence === "low" && (
+                <span
+                  className="shrink-0 rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                  title={CONFIDENCE_EXPLANATION}
+                >
+                  unsichere Extraktion
+                </span>
+              )}
             </span>
           </span>
           <ChevronDown
@@ -357,13 +359,13 @@ export function PositionCard({
                       value={draft.menge}
                       onChange={(e) => updateField("menge", Number(e.target.value))}
                       onBlur={() => commit(`positionen[${index}].menge`)}
-                      className="flex-1 h-auto min-w-0 p-0 text-xl font-bold bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                      className="flex-1 h-auto min-w-0 p-0 text-xl font-bold bg-transparent border-x-0 border-t-0 border-b border-dashed border-muted-foreground/25 rounded-none shadow-none transition-colors hover:border-muted-foreground/50 hover:bg-muted/40 focus-visible:border-ring focus-visible:bg-muted/30 focus-visible:ring-0 focus-visible:ring-offset-0"
                     />
                     <Input
                       value={draft.einheit}
                       onChange={(e) => updateField("einheit", e.target.value)}
                       onBlur={() => commit(`positionen[${index}].einheit`)}
-                      className="h-auto p-0 text-sm font-semibold bg-transparent border-0 shadow-none w-14 shrink-0 text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
+                      className="h-auto p-0 text-sm font-semibold bg-transparent border-x-0 border-t-0 border-b border-dashed border-muted-foreground/25 rounded-none shadow-none w-14 shrink-0 text-muted-foreground transition-colors hover:border-muted-foreground/50 hover:bg-muted/40 focus-visible:border-ring focus-visible:bg-muted/30 focus-visible:ring-0 focus-visible:ring-offset-0"
                     />
                   </div>
                 </div>
@@ -374,14 +376,14 @@ export function PositionCard({
                     value={draft.lieferzeit ?? ""}
                     onChange={(e) => updateField("lieferzeit", e.target.value)}
                     onBlur={() => commit(`positionen[${index}].lieferzeit`)}
-                    className="h-auto p-0 text-xl font-bold bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-auto p-0 text-xl font-bold bg-transparent border-x-0 border-t-0 border-b border-dashed border-muted-foreground/25 rounded-none shadow-none transition-colors hover:border-muted-foreground/50 hover:bg-muted/40 focus-visible:border-ring focus-visible:bg-muted/30 focus-visible:ring-0 focus-visible:ring-offset-0"
                     placeholder="z. B. 6 Wo."
                   />
                   <Input
                     value={draft.lieferwerk ?? ""}
                     onChange={(e) => updateField("lieferwerk", e.target.value)}
                     onBlur={() => commit(`positionen[${index}].lieferwerk`)}
-                    className="h-auto p-0 text-xs font-medium bg-transparent border-0 shadow-none text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-auto p-0 text-xs font-medium bg-transparent border-x-0 border-t-0 border-b border-dashed border-muted-foreground/25 rounded-none shadow-none text-muted-foreground transition-colors hover:border-muted-foreground/50 hover:bg-muted/40 focus-visible:border-ring focus-visible:bg-muted/30 focus-visible:ring-0 focus-visible:ring-offset-0"
                     placeholder="Werk"
                   />
                 </div>
@@ -399,7 +401,7 @@ export function PositionCard({
                     value={unitPriceDraft}
                     onChange={(e) => setUnitPriceDraft(Number(e.target.value))}
                     onBlur={commitUnitPrice}
-                    className="h-auto p-0 text-xl font-bold bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-auto p-0 text-xl font-bold bg-transparent border-x-0 border-t-0 border-b border-dashed border-muted-foreground/25 rounded-none shadow-none transition-colors hover:border-muted-foreground/50 hover:bg-muted/40 focus-visible:border-ring focus-visible:bg-muted/30 focus-visible:ring-0 focus-visible:ring-offset-0"
                     placeholder="—"
                   />
                 </div>
@@ -503,6 +505,51 @@ export function PositionCard({
                     onBlur={() => commit(`positionen[${index}].abmessungen`)}
                   />
                 </FormField>
+
+                <FormField label="Verpackungsart">
+                  <Input
+                    value={draft.verpackungsart ?? ""}
+                    onChange={(e) => updateField("verpackungsart", e.target.value)}
+                    onBlur={() => commit(`positionen[${index}].verpackungsart`)}
+                    placeholder="z. B. Holzkiste"
+                  />
+                </FormField>
+
+                <FormField label="Stückgewicht (kg)">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={draft.gewicht_stueck_kg ?? ""}
+                    onChange={(e) => updateField("gewicht_stueck_kg", optionalNumber(e.target.value))}
+                    onBlur={() => commit(`positionen[${index}].gewicht_stueck_kg`)}
+                    placeholder="0,000"
+                  />
+                </FormField>
+
+                <FormField label="Nettogewicht (kg)">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={draft.gewicht_netto_kg ?? ""}
+                    onChange={(e) => updateField("gewicht_netto_kg", optionalNumber(e.target.value))}
+                    onBlur={() => commit(`positionen[${index}].gewicht_netto_kg`)}
+                    placeholder="0,000"
+                  />
+                </FormField>
+
+                <FormField label="Bruttogewicht (kg)">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={draft.gewicht_brutto_kg ?? ""}
+                    onChange={(e) => updateField("gewicht_brutto_kg", optionalNumber(e.target.value))}
+                    onBlur={() => commit(`positionen[${index}].gewicht_brutto_kg`)}
+                    placeholder="0,000"
+                  />
+                </FormField>
               </div>
             )}
           </>
@@ -538,6 +585,10 @@ function buildPositionSourceCandidates(position: Position): string[] {
     String(position.pos_nr),
     position.bezeichnung,
     position.abmessungen ?? "",
+    position.verpackungsart ?? "",
+    position.gewicht_stueck_kg != null ? String(position.gewicht_stueck_kg) : "",
+    position.gewicht_netto_kg != null ? String(position.gewicht_netto_kg) : "",
+    position.gewicht_brutto_kg != null ? String(position.gewicht_brutto_kg) : "",
     position.menge ? String(position.menge) : "",
   ].filter((value) => value.trim().length > 0);
 }
@@ -562,4 +613,10 @@ function looksLikeArticleNumber(value: string): boolean {
     /\d/.test(compact) &&
     /^[A-Za-z0-9._/-]+$/.test(compact)
   );
+}
+
+function optionalNumber(value: string): number | null {
+  if (value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }

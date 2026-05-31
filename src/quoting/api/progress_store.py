@@ -172,6 +172,33 @@ class ProgressStore:
         self.write(review_id, data)
         self.bus.publish(review_id, {"event": "done", "data": data})
 
+    def cancel(self, review_id: str, message: str = "Pipeline manuell gestoppt") -> None:
+        """Mark a running pipeline as cancelled (user-initiated stop).
+
+        Distinct from :meth:`fail` so the UI can tell an intentional stop
+        apart from an error. Any in-flight/queued steps are marked skipped.
+        """
+        data = self.read(review_id)
+        if data is None:
+            data = {"review_id": review_id, "status": "running", "steps": [], "result": None, "error": None}
+
+        now = _now_iso()
+
+        for step in data.get("steps", []):
+            if step.get("status") in {"running", "pending"}:
+                step["status"] = "skipped"
+                step["detail"] = message
+                step["updated_at"] = now
+                step["completed_at"] = now
+
+        data["status"] = "cancelled"
+        data["current_detail"] = message
+        data["error"] = message
+        data["updated_at"] = now
+
+        self.write(review_id, data)
+        self.bus.publish(review_id, {"event": "error", "data": data})
+
     def fail(self, review_id: str, error: str) -> None:
         data = self.read(review_id)
         if data is None:

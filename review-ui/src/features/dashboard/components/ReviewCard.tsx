@@ -1,10 +1,10 @@
-import { AlertCircle, ArrowUpRight, FileDown } from "lucide-react";
-import { Link } from "react-router-dom";
+import { AlertCircle, ShieldAlert } from "lucide-react";
+import type { KeyboardEvent } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { cn } from "@/shared/lib/cn";
 import { formatDate, formatEur } from "@/shared/lib/format";
-import { pdfUrl } from "@/shared/lib/pdfUrl";
 
 import { matchRate, type ReviewStatus, type ReviewSummary } from "../schemas/reviewSummary";
 
@@ -30,21 +30,42 @@ export function ReviewCard({
   selectionDisabled = false,
   onToggleSelected,
 }: ReviewCardProps) {
+  const navigate = useNavigate();
   const detailHref = `/reviews/${encodeURIComponent(review.review_id)}`;
   const cfg = STATUS_CONFIG[review.status];
   const rate = matchRate(review);
+  const manualClarification = Boolean(review.escalation?.escalated);
+  const statusLabel = manualClarification ? "Klärung" : cfg.label;
   const hasOpenPositions = review.matches_no_match > 0 && review.status !== "abgeschlossen";
-  const needsReview = review.status !== "abgeschlossen";
+
+  const openReview = () => navigate(detailHref);
+  const openReviewFromKeyboard = (event: KeyboardEvent<HTMLTableRowElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    openReview();
+  };
 
   return (
     <tr
+      role="link"
+      tabIndex={0}
+      aria-label={`Review ${review.subject || review.review_id} öffnen`}
+      onClick={openReview}
+      onKeyDown={openReviewFromKeyboard}
       className={cn(
-        "group border-b border-border last:border-0 transition-colors hover:bg-surface-sunk",
+        "group cursor-pointer border-b border-border last:border-0 transition-all duration-150",
+        "hover:bg-ek-blue-soft/35 hover:shadow-[inset_3px_0_0_hsl(var(--ek-blue))]",
+        "focus-visible:bg-ek-blue-soft/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+        manualClarification && "bg-warning-soft/40 hover:bg-ek-blue-soft/35",
         selected && "bg-info-soft/50 hover:bg-info-soft/70",
       )}
     >
       {/* Auswahl */}
-      <td className="w-12 px-4 py-4 align-middle">
+      <td
+        className="w-12 px-4 py-4 align-middle"
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
         <Checkbox
           checked={selected}
           disabled={selectionDisabled}
@@ -56,34 +77,52 @@ export function ReviewCard({
       {/* Status */}
       <td className="w-36 px-4 py-4 align-middle">
         <div className="flex items-center gap-2">
-          <span className={cn("h-2 w-2 shrink-0 rounded-full", cfg.dot)} aria-hidden="true" />
-          <span className={cn("text-xs font-semibold", cfg.text)}>{cfg.label}</span>
+          {manualClarification ? (
+            <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-warning" aria-hidden="true" />
+          ) : (
+            <span className={cn("h-2 w-2 shrink-0 rounded-full", cfg.dot)} aria-hidden="true" />
+          )}
+          <span className={cn("text-xs font-semibold", manualClarification ? "text-warning" : cfg.text)}>
+            {statusLabel}
+          </span>
         </div>
       </td>
 
       {/* Kunde */}
       <td className="w-48 px-4 py-4 align-middle">
-        <Link
-          to={detailHref}
-          className="block max-w-[11rem] truncate text-sm font-semibold text-foreground group-hover:text-brand"
-          tabIndex={-1}
-        >
+        <span className="block max-w-[11rem] truncate text-sm font-semibold text-foreground transition-colors group-hover:text-foreground">
           {review.sender || "—"}
-        </Link>
+        </span>
       </td>
 
       {/* Betreff + ID */}
       <td className="px-4 py-4 align-middle">
-        <Link
-          to={detailHref}
-          className="block truncate text-sm text-muted-foreground group-hover:text-foreground"
-          tabIndex={-1}
-        >
+        <span className="block truncate text-sm text-muted-foreground transition-colors group-hover:text-foreground">
           {review.subject || "(ohne Betreff)"}
-        </Link>
+        </span>
         <code className="mt-0.5 block font-mono text-[10px] text-muted-foreground/40">
           {review.review_id}
         </code>
+        {hasOpenPositions && (
+          <span
+            title={`${review.matches_no_match} Position${review.matches_no_match !== 1 ? "en" : ""} ohne Match`}
+            className="mt-1 inline-flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand"
+          >
+            <AlertCircle className="h-2.5 w-2.5" aria-hidden="true" />
+            {review.matches_no_match} ohne Match
+          </span>
+        )}
+        {manualClarification && (
+          <div
+            className="mt-1 flex max-w-full items-center gap-1.5 truncate text-[11px] font-medium text-warning"
+            title={review.escalation?.reason}
+          >
+            <ShieldAlert className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <span className="truncate">
+              {review.escalation?.reason || "Manuelle Klärung erforderlich"}
+            </span>
+          </div>
+        )}
       </td>
 
       {/* Datum */}
@@ -94,7 +133,7 @@ export function ReviewCard({
       </td>
 
       {/* Positionen */}
-      <td className="w-16 px-4 py-4 text-right align-middle">
+      <td className="w-16 px-4 py-4 text-center align-middle">
         <span className="text-xs tabular-nums text-muted-foreground">{review.positions}</span>
       </td>
 
@@ -115,52 +154,6 @@ export function ReviewCard({
         <span className="text-sm font-semibold tabular-nums text-foreground">
           {formatEur(review.total_eur)}
         </span>
-      </td>
-
-      {/* Aktion + Warnungen */}
-      <td className="w-36 px-4 py-4 text-right align-middle">
-        <div className="flex items-center justify-end gap-2">
-          {hasOpenPositions && (
-            <span
-              title={`${review.matches_no_match} Position${review.matches_no_match !== 1 ? "en" : ""} ohne Match`}
-              className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand"
-            >
-              <AlertCircle className="h-2.5 w-2.5" aria-hidden="true" />
-              {review.matches_no_match}
-            </span>
-          )}
-          {needsReview && (
-            <Link
-              to={detailHref}
-              className="inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-all hover:-translate-y-px hover:bg-brand-dark"
-            >
-              <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-              Review
-            </Link>
-          )}
-          {review.has_pdf && !needsReview && (
-            <a
-              href={pdfUrl(review.review_id, "current", review.updated_at)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-all hover:-translate-y-px hover:bg-brand-dark"
-              onClick={(e) => e.stopPropagation()}
-              title="PDF öffnen"
-            >
-              <FileDown className="h-3 w-3" aria-hidden="true" />
-              PDF
-            </a>
-          )}
-          {!review.has_pdf && !needsReview && (
-            <Link
-              to={detailHref}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
-            >
-              <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-              Öffnen
-            </Link>
-          )}
-        </div>
       </td>
     </tr>
   );

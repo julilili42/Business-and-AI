@@ -33,13 +33,35 @@ export function useSaveAndRegenerate(reviewId: string | undefined) {
       if (input.overrides) {
         await reviewsApi.saveOverrides(reviewId, input.overrides);
       }
-      return reviewsApi.regenerate(reviewId);
+      // Editing only reprices; the draft PDF (shown solely on the approval
+      // step) is rebuilt when the user gets there — see useRegenerateDraftPdf.
+      return reviewsApi.regenerate(reviewId, false);
     },
     onSuccess: () => {
       if (!reviewId) return;
       queryClient.invalidateQueries({ queryKey: reviewQueryKey(reviewId) });
       queryClient.invalidateQueries({ queryKey: approvalQueryKey(reviewId) });
       queryClient.invalidateQueries({ queryKey: reviewListQueryKey });
+    },
+  });
+}
+
+/**
+ * Rebuild the draft PDF (full regenerate incl. PDF). Used when entering the
+ * approval step so the side-by-side compare reflects the latest edits, which
+ * the cheaper edit-time reprice intentionally skipped.
+ */
+export function useRegenerateDraftPdf(reviewId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => {
+      if (!reviewId) throw new Error("reviewId is required");
+      return reviewsApi.regenerate(reviewId, true);
+    },
+    onSuccess: () => {
+      if (!reviewId) return;
+      queryClient.invalidateQueries({ queryKey: reviewQueryKey(reviewId) });
     },
   });
 }
@@ -60,6 +82,58 @@ export function useFinalize(reviewId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: reviewQueryKey(reviewId) });
       queryClient.invalidateQueries({ queryKey: approvalQueryKey(reviewId) });
       queryClient.invalidateQueries({ queryKey: reviewListQueryKey });
+    },
+  });
+}
+
+/**
+ * Escalate a review to Engineering/Plant (or withdraw the escalation).
+ * Mirrors the as-is hand-off branch for inquiries Sales can't auto-answer.
+ */
+export function useEscalateReview(reviewId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { reason: string; actor?: string } | null) => {
+      if (!reviewId) throw new Error("reviewId is required");
+      return input === null
+        ? reviewsApi.clearEscalation(reviewId)
+        : reviewsApi.escalate(reviewId, input.reason, input.actor);
+    },
+    onSuccess: () => {
+      if (!reviewId) return;
+      queryClient.invalidateQueries({ queryKey: reviewQueryKey(reviewId) });
+      queryClient.invalidateQueries({ queryKey: reviewListQueryKey });
+    },
+  });
+}
+
+export function useUploadMailAttachment(reviewId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => {
+      if (!reviewId) throw new Error("reviewId is required");
+      return reviewsApi.uploadMailAttachment(reviewId, file);
+    },
+    onSuccess: () => {
+      if (!reviewId) return;
+      queryClient.invalidateQueries({ queryKey: reviewQueryKey(reviewId) });
+    },
+  });
+}
+
+export function useDeleteMailAttachment(reviewId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (fileName: string) => {
+      if (!reviewId) throw new Error("reviewId is required");
+      return reviewsApi.deleteMailAttachment(reviewId, fileName);
+    },
+    onSuccess: () => {
+      if (!reviewId) return;
+      queryClient.invalidateQueries({ queryKey: reviewQueryKey(reviewId) });
     },
   });
 }

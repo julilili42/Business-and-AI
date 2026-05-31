@@ -99,7 +99,7 @@ export function CustomerForm({
       className="scroll-mt-6 space-y-6"
     >
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-h-10 flex-wrap items-center justify-between gap-2">
           <h2 id="customer-data-heading" className="section-label">
             Kunde &amp; Anfrage-Header
           </h2>

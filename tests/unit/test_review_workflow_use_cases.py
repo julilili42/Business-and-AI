@@ -223,6 +223,38 @@ def test_regenerate_quotation_writes_draft_pdf_and_reviewed_quotation(
     assert sqlite_repo.load_quotation_reviewed(review_id)["gesamtsumme"] == 200
 
 
+def test_regenerate_quotation_skips_pdf_when_build_pdf_false(
+    sqlite_repo,
+    sample_anfrage,
+):
+    review_id = "review-regenerate-nopdf"
+    sqlite_repo.create_review(review_id)
+    pdf_calls: list[object] = []
+
+    def load_review_data(_review_id, _pipeline):
+        return sample_anfrage, [_match()], []
+
+    def build_pdf(_anfrage, _quotation, pdf_path, *, is_final, company_profile):
+        pdf_calls.append(pdf_path)
+        Path(pdf_path).write_bytes(b"%PDF draft")
+
+    result = RegenerateQuotationUseCase(
+        repo=sqlite_repo,
+        pipeline=_pipeline(),  # type: ignore[arg-type]
+        settings_loader=AppSettings,
+        review_data_loader=load_review_data,
+        review_data=ReviewDataService(sqlite_repo),
+        quotation_builder=lambda *_args: _quotation(),
+        pdf_builder=build_pdf,
+    ).execute(review_id, build_pdf=False)
+
+    # Repriced and persisted, but no PDF built/registered.
+    assert result["gesamtsumme"] == 200
+    assert pdf_calls == []
+    assert sqlite_repo.current_document(review_id, kind="draft_pdf") is None
+    assert sqlite_repo.load_quotation_reviewed(review_id)["gesamtsumme"] == 200
+
+
 def test_finalize_quotation_writes_final_pdf_and_approves_review(
     sqlite_repo,
     sample_anfrage,

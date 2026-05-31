@@ -144,6 +144,7 @@ def _set_manual_match(review_id: str, pos_nr: int, artikel_nr: str) -> dict:
         matched_artikelnr=record.artikel_nr,
         matched_bezeichnung=record.bezeichnung,
         matched_row=record.to_row(),
+        manual=True,
     )
 
     updated = rs.upsert_match(matches, new_match)
@@ -256,6 +257,7 @@ def create_custom_article_match(
         matched_artikelnr=artikel_nr,
         matched_bezeichnung=bezeichnung,
         matched_row=custom_row,
+        manual=True,
     )
     updated_matches = rs.upsert_match(matches, new_match)
     repo.save_matches_reviewed(review_id, [m.to_dict() for m in updated_matches])

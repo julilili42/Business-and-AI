@@ -15,6 +15,8 @@ interface ComparePanesProps {
   reviewId: string;
   detail: ReviewDetail;
   isApproved: boolean;
+  /** Bumped after an on-entry draft rebuild so the iframe reloads the new file. */
+  draftPdfVersion?: number;
   focusMode?: boolean;
 }
 
@@ -32,6 +34,7 @@ export function ComparePanes({
   reviewId,
   detail,
   isApproved,
+  draftPdfVersion = 0,
   focusMode = false,
 }: ComparePanesProps) {
   const attachmentNames = detail.mail.attachments.map((a) => a.name);
@@ -39,9 +42,10 @@ export function ComparePanes({
 
   // Cache buster lives at the comparison level — when the parent
   // updates `detail` (i.e. after a regenerate or a finalize), both
-  // generated PDF viewers refresh in lockstep.
+  // generated PDF viewers refresh in lockstep. draftPdfVersion bumps after
+  // an on-entry draft rebuild so the draft iframe reloads the new file.
   const cacheBuster =
-    detail.review_id + "::" + (isApproved ? "approved" : "draft");
+    detail.review_id + "::" + (isApproved ? "approved" : "draft") + "::v" + draftPdfVersion;
   const previewClassName = focusMode
     ? "h-[calc(100vh-14rem)] min-h-[720px]"
     : undefined;

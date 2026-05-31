@@ -1,4 +1,5 @@
 import { Pill } from "@/shared/components/ui/pill";
+import { ThemeToggle } from "@/shared/components/ui/ThemeToggle";
 
 import { Breadcrumb } from "./Breadcrumb";
 import { ResetReviewAction } from "./ResetReviewAction";
@@ -21,8 +22,8 @@ export function ReviewHero({
   const isOutlookReview = reviewId.length === 12;
 
   return (
-    <header className="mb-8">
-      <div className="flex items-center justify-between mb-4">
+    <header className="mb-5">
+      <div className="flex items-center justify-between mb-2">
         <Breadcrumb
           isOutlookReview={isOutlookReview}
           reviewId={reviewId}
@@ -30,20 +31,25 @@ export function ReviewHero({
           isApproved={isApproved}
           approvedAt={approvedAt}
         />
-        <ResetReviewAction reviewId={reviewId} />
+        <div
+          role="group"
+          aria-label="Review-Aktionen"
+          className="inline-flex items-center lg:rounded-md lg:border lg:border-border lg:bg-surface lg:p-0.5 lg:shadow-sm"
+        >
+          <ResetReviewAction reviewId={reviewId} />
+          <div className="ml-0.5 hidden border-l border-border pl-0.5 lg:block">
+            <ThemeToggle iconOnly className="h-8 w-8" />
+          </div>
+        </div>
       </div>
 
       <div className="min-w-0">
-        <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
+        <h1 className="font-display text-2xl font-extrabold leading-tight tracking-tight md:text-3xl">
           Angebots-Review<span className="text-brand">.</span>
         </h1>
-        <p className="max-w-2xl mt-3 text-base leading-relaxed text-muted-foreground">
-          KI-extrahierte Anfrage prüfen, Stammdaten-Treffer validieren und ein
-          verkaufsfertiges Angebot erstellen.
-        </p>
 
         {fileName && (
-          <div className="flex flex-wrap items-center gap-2 mt-4">
+          <div className="flex flex-wrap items-center gap-2 mt-3">
             <Pill tone="neutral">{fileName}</Pill>
           </div>
         )}

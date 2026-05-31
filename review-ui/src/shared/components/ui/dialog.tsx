@@ -53,7 +53,7 @@ export const DialogOverlay = React.forwardRef<
       <motion.div
         ref={ref}
         className={cn(
-          "fixed inset-0 z-50 bg-foreground/35 backdrop-blur-[2px]",
+          "fixed inset-0 z-50 bg-black/45 backdrop-blur-[1.5px] dark:bg-black/55",
           className,
         )}
         initial={{ opacity: 0 }}

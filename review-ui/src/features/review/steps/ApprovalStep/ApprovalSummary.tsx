@@ -3,18 +3,29 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronDown,
+  MessageSquarePlus,
   ShieldAlert,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import type { ReviewDetail } from "@/shared/api/reviews";
+import { Button } from "@/shared/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
+import { Label } from "@/shared/components/ui/label";
 import { cn } from "@/shared/lib/cn";
 import { formatEur, formatQty } from "@/shared/lib/format";
 import type { MatchStatus } from "@/shared/schemas/matchResult";
 import type { ManualOverride, QuotationItem } from "@/shared/schemas/quotation";
 
 import type { Issue, QualityGateResult } from "../../hooks/useQualityGate";
+import { useEscalateReview } from "../../hooks/useReviewMutations";
 import { RequirementsChecklist } from "./RequirementsChecklist";
 
 interface ApprovalSummaryProps {
@@ -67,9 +78,30 @@ export function ApprovalSummary({
   const showSidePanel = showIssues || showApprovalControls;
   const readinessCopy = resolveReadinessCopy(state, isApproved);
   const [expanded, setExpanded] = useState(true);
+  const [clarificationOpen, setClarificationOpen] = useState(false);
+  const [clarificationReason, setClarificationReason] = useState("");
+  const escalation = useEscalateReview(detail.review_id);
+  const manualClarificationActive = Boolean(detail.escalation?.escalated);
+  const showManualClarification = !isApproved || manualClarificationActive;
   const toggleLabel = expanded
-    ? "Abschluss & Freigabe einklappen"
-    : "Abschluss & Freigabe ausklappen";
+    ? "Anforderungen & Freigabe einklappen"
+    : "Anforderungen & Freigabe ausklappen";
+
+  const closeClarificationEditor = () => {
+    setClarificationOpen(false);
+    setClarificationReason("");
+  };
+
+  const submitClarification = () => {
+    const reason = clarificationReason.trim();
+    if (!reason) return;
+    escalation.mutate(
+      { reason },
+      {
+        onSuccess: closeClarificationEditor,
+      },
+    );
+  };
 
   return (
     <section
@@ -90,7 +122,17 @@ export function ApprovalSummary({
             )}
           </div>
         </div>
-        <div className="flex shrink-0 items-center">
+        <div className="flex shrink-0 items-center gap-2">
+          {showManualClarification && (
+            <ManualClarificationHeaderAction
+              active={manualClarificationActive}
+              open={clarificationOpen}
+              pending={escalation.isPending}
+              reason={detail.escalation?.reason}
+              onOpenChange={setClarificationOpen}
+              onClear={() => escalation.mutate(null)}
+            />
+          )}
           <button
             type="button"
             aria-expanded={expanded}
@@ -111,6 +153,31 @@ export function ApprovalSummary({
         </div>
       </header>
 
+      {manualClarificationActive && detail.escalation && (
+        <div className="border-b border-warning/25 bg-warning-soft/60 px-4 py-2.5">
+          <div className="flex min-w-0 items-start gap-2 text-sm">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+            <div className="min-w-0">
+              <span className="font-semibold text-warning">
+                Manuelle Klärung erforderlich:
+              </span>{" "}
+              <span className="text-foreground">{detail.escalation.reason}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ManualClarificationDialog
+        open={clarificationOpen && !manualClarificationActive}
+        reviewId={detail.review_id}
+        reason={clarificationReason}
+        pending={escalation.isPending}
+        onOpenChange={setClarificationOpen}
+        onReasonChange={setClarificationReason}
+        onCancel={closeClarificationEditor}
+        onSubmit={submitClarification}
+      />
+
       <div
         id="approval-summary-content"
         className={cn("p-4", !expanded && "hidden")}
@@ -126,6 +193,7 @@ export function ApprovalSummary({
               <RequirementsChecklist
                 anforderungen={detail.anfrage.anforderungen ?? []}
                 acknowledgedIndices={detail.requirements_acknowledged ?? []}
+                mailAttachments={detail.mail_attachments}
               />
             )}
 
@@ -135,7 +203,8 @@ export function ApprovalSummary({
                   <thead className="sticky top-0 bg-muted text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="w-16 px-3 py-1.5">Pos</th>
-                      <th className="min-w-56 px-3 py-1.5">Artikel</th>
+                      <th className="w-36 px-3 py-1.5">Artikel-Nr.</th>
+                      <th className="min-w-64 px-3 py-1.5">Bezeichnung</th>
                       <th className="px-3 py-1.5 text-right">Menge</th>
                       <th className="px-3 py-1.5 text-right">Stückpreis</th>
                       <th className="px-3 py-1.5 text-right">Gesamt</th>
@@ -154,7 +223,7 @@ export function ApprovalSummary({
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={6} className="px-3 py-4 text-sm text-muted-foreground">
+                        <td colSpan={7} className="px-3 py-4 text-sm text-muted-foreground">
                           Keine Preispositionen vorhanden.
                         </td>
                       </tr>
@@ -163,7 +232,7 @@ export function ApprovalSummary({
                   <tfoot className="bg-muted/35">
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="border-t border-border px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                       >
                         Summe
@@ -221,6 +290,167 @@ export function ApprovalSummary({
   );
 }
 
+function ManualClarificationHeaderAction({
+  active,
+  open,
+  pending,
+  reason,
+  onOpenChange,
+  onClear,
+}: {
+  active: boolean;
+  open: boolean;
+  pending: boolean;
+  reason?: string;
+  onOpenChange: (open: boolean) => void;
+  onClear: () => void;
+}) {
+  if (active) {
+    return (
+      <div className="flex items-center gap-2">
+        <span
+          className="hidden max-w-[16rem] truncate rounded-full border border-warning/30 bg-warning-soft px-2.5 py-1 text-xs font-semibold text-warning sm:inline-flex"
+          title={reason}
+        >
+          Klärung aktiv
+        </span>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={pending}
+          onClick={onClear}
+        >
+          Zurücknehmen
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      className={cn(
+        "text-muted-foreground shadow-sm hover:border-foreground/30 hover:bg-muted hover:text-foreground",
+        open && "border-ring/50 bg-muted text-foreground ring-2 ring-ring/20",
+      )}
+      onClick={() => onOpenChange(!open)}
+    >
+      <MessageSquarePlus className="h-3.5 w-3.5" aria-hidden="true" />
+      {open ? "Ticket offen" : "Klärung anlegen"}
+    </Button>
+  );
+}
+
+function ManualClarificationDialog({
+  open,
+  reviewId,
+  reason,
+  pending,
+  onOpenChange,
+  onReasonChange,
+  onCancel,
+  onSubmit,
+}: {
+  open: boolean;
+  reviewId: string;
+  reason: string;
+  pending: boolean;
+  onOpenChange: (open: boolean) => void;
+  onReasonChange: (reason: string) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl overflow-hidden p-0">
+        <DialogHeader className="border-b border-border bg-surface-sunk px-5 py-4">
+          <DialogTitle>Manuelle Klärung anlegen</DialogTitle>
+          <DialogDescription>
+            Ein internes Ticket für Punkte, die vor der Freigabe außerhalb des normalen Reviews geklärt werden müssen.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 px-5 py-4">
+          <div className="overflow-hidden rounded-md border border-border">
+            <div className="bg-muted px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Ticket
+            </div>
+            <div className="grid grid-cols-1 divide-y divide-border text-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <TicketMeta label="Status" value="Offen" />
+              <TicketMeta label="Typ" value="Review-Klärung" />
+              <TicketMeta label="Review" value={reviewId} mono />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label
+              htmlFor={`manual-clarification-${reviewId}`}
+              className="text-xs font-semibold text-foreground"
+            >
+              Klärungsgrund
+            </Label>
+            <textarea
+              id={`manual-clarification-${reviewId}`}
+              className="flex min-h-[124px] w-full resize-none rounded-md border border-input bg-surface px-3 py-2 text-sm leading-relaxed placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              value={reason}
+              onChange={(event) => onReasonChange(event.target.value)}
+              autoFocus
+              placeholder="z. B. Zeichnung prüfen, Verpackungsdaten nachfragen oder Werkskalkulation erforderlich"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-border bg-surface-sunk px-5 py-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={onCancel}
+          >
+            Abbrechen
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!reason.trim() || pending}
+            onClick={onSubmit}
+          >
+            Angebot markieren
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TicketMeta({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="min-w-0 px-3 py-2.5">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-0.5 truncate text-xs font-semibold text-foreground",
+          mono && "font-mono",
+        )}
+        title={value}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function StatusMark({ state, isApproved }: { state: GateState; isApproved: boolean }) {
   if (isApproved) {
     return (
@@ -231,7 +461,7 @@ function StatusMark({ state, isApproved }: { state: GateState; isApproved: boole
   }
   if (state === "ok") {
     return (
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-success">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-ek-blue/25 bg-ek-blue-soft text-ek-blue">
         <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
       </span>
     );
@@ -280,14 +510,14 @@ function IssuesBlock({ blockers, warnings }: { blockers: Issue[]; warnings: Issu
     <div className="space-y-2">
       {blockers.length > 0 && (
         <IssueGroup
-          title={`Probleme (${blockers.length})`}
+          title="Probleme"
           issues={blockers}
           severity="blocker"
         />
       )}
       {warnings.length > 0 && (
         <IssueGroup
-          title={`Empfehlungen (${warnings.length})`}
+          title="Empfehlungen"
           issues={warnings}
           severity="warning"
         />
@@ -312,10 +542,13 @@ function IssueGroup({
       : "border-warning/30 bg-warning-soft text-warning";
 
   return (
-    <div className={cn("rounded-md border p-2.5", tone)}>
-      <div className="mb-1.5 flex items-center gap-2">
-        <Icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-        <div className="text-xs font-bold uppercase tracking-wide">{title}</div>
+    <div className={cn("rounded-md border p-2", tone)}>
+      <div className="mb-1.5 flex items-center gap-2 px-0.5">
+        <Icon className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+        <div className="text-[11px] font-bold uppercase tracking-wide">{title}</div>
+        <span className="ml-auto rounded-full bg-surface/80 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-current">
+          {issues.length}
+        </span>
       </div>
       <ul className="space-y-1">
         {issues.map((issue) => (
@@ -330,14 +563,19 @@ function IssueItem({ issue }: { issue: Issue }) {
   const { reviewId } = useParams<{ reviewId: string }>();
   const target = resolveActionTarget(reviewId, issue.step);
   return (
-    <li className="flex items-center gap-3 rounded-sm bg-surface/60 px-2 py-1.5 text-sm">
-      <div className="min-w-0 flex-1 font-semibold leading-snug text-foreground">
-        {issue.title}
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-sm bg-surface/70 px-2 py-1.5">
+      <div className="min-w-0">
+        <div
+          className="truncate text-xs font-semibold leading-snug text-foreground"
+          title={issue.description ? `${issue.title} - ${issue.description}` : issue.title}
+        >
+          {issue.title}
+        </div>
       </div>
       {target && (
         <Link
           to={target}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-semibold text-foreground hover:bg-muted"
+          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border bg-surface px-2 text-[11px] font-semibold text-foreground hover:bg-muted"
         >
           Beheben
           <ArrowRight className="h-3 w-3" aria-hidden="true" />
@@ -374,9 +612,11 @@ function SummaryRow({
         {item.pos_nr}
       </td>
       <td className="px-3 py-1.5">
-        <div className="font-medium text-foreground">{item.artikel_nr || "—"}</div>
-        <div className="max-w-[28rem] truncate text-xs text-muted-foreground">
-          {item.bezeichnung}
+        <span className="font-medium text-foreground">{item.artikel_nr || "—"}</span>
+      </td>
+      <td className="px-3 py-1.5">
+        <div className="max-w-[32rem] truncate text-xs text-muted-foreground">
+          {item.bezeichnung || "—"}
         </div>
       </td>
       <td className="px-3 py-1.5 text-right tabular-nums">

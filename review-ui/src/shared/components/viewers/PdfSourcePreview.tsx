@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   Component,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -73,8 +74,10 @@ export function PdfSourcePreview({
 }: PdfSourcePreviewProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const pageRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const renderedPagesRef = useRef<Set<number>>(new Set());
   const [pageWidth, setPageWidth] = useState(760);
   const [numPages, setNumPages] = useState(0);
+  const [renderTick, setRenderTick] = useState(0);
 
   const targetKey = useMemo(
     () => (sourceTarget ? JSON.stringify(sourceTarget) : "none"),
@@ -92,6 +95,12 @@ export function PdfSourcePreview({
     () => highlightQuery.data?.areas ?? [],
     [highlightQuery.data?.areas],
   );
+
+  const markPageRendered = useCallback((pageIndex: number) => {
+    if (renderedPagesRef.current.has(pageIndex)) return;
+    renderedPagesRef.current.add(pageIndex);
+    setRenderTick((value) => value + 1);
+  }, []);
 
   const initialPage =
     highlightAreas[0]?.pageIndex ??
@@ -117,23 +126,68 @@ export function PdfSourcePreview({
   }, []);
 
   useEffect(() => {
-    if (!numPages || !sourceTarget) return;
+    if (!numPages || !sourceTarget || highlightQuery.isLoading) return;
 
     const targetPage = Math.max(0, Math.min(numPages - 1, initialPage));
-    const pageElement = pageRefs.current[targetPage];
-    const viewport = viewportRef.current;
-    if (!pageElement || !viewport) return;
+    const area = highlightAreas.find((item) => item.pageIndex === targetPage) ?? null;
 
-    const timeout = window.setTimeout(() => {
+    let cancelled = false;
+    let timeout: number | undefined;
+    let attempts = 0;
+
+    const scrollToTarget = () => {
+      if (cancelled) return;
+      attempts += 1;
+
+      const pageElement = pageRefs.current[targetPage];
+      const viewport = viewportRef.current;
+      if (
+        !pageElement ||
+        !viewport ||
+        pageElement.clientHeight <= 0 ||
+        !renderedPagesRef.current.has(targetPage)
+      ) {
+        if (attempts < 20) {
+          timeout = window.setTimeout(scrollToTarget, 50);
+        }
+        return;
+      }
+
+      const pageRect = pageElement.getBoundingClientRect();
+      const viewportRect = viewport.getBoundingClientRect();
       const top =
-        pageElement.getBoundingClientRect().top -
-        viewport.getBoundingClientRect().top +
+        pageRect.top -
+        viewportRect.top +
         viewport.scrollTop;
-      viewport.scrollTo({ top, behavior: "smooth" });
-    }, 180);
+      const highlightTop = area ? (area.top / 100) * pageElement.clientHeight : 0;
+      const highlightHeight = area ? (area.height / 100) * pageElement.clientHeight : 0;
+      const viewportOffset = area
+        ? Math.max(80, (viewport.clientHeight - highlightHeight) * 0.35)
+        : 16;
 
-    return () => window.clearTimeout(timeout);
-  }, [initialPage, numPages, sourceTarget, targetKey]);
+      viewport.scrollTo({
+        top: Math.max(0, top + highlightTop - viewportOffset),
+        behavior: "smooth",
+      });
+    };
+
+    timeout = window.setTimeout(scrollToTarget, 0);
+
+    return () => {
+      cancelled = true;
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [
+    highlightAreas,
+    highlightQuery.data?.pageIndex,
+    highlightQuery.isLoading,
+    initialPage,
+    numPages,
+    pageWidth,
+    renderTick,
+    sourceTarget,
+    targetKey,
+  ]);
 
   return (
     <div className={cn("flex flex-col", className ?? "h-[700px]")}>
@@ -157,7 +211,7 @@ export function PdfSourcePreview({
 
       <div
         ref={viewportRef}
-        className="min-h-0 flex-1 overflow-auto bg-muted/40 px-4 py-4"
+        className="scrollbar-none min-h-0 flex-1 overflow-auto bg-muted/40 px-4 py-4"
       >
         <PdfRenderBoundary key={fileUrl}>
           <Document
@@ -171,6 +225,7 @@ export function PdfSourcePreview({
               />
             }
             onLoadSuccess={({ numPages: nextNumPages }) => {
+              renderedPagesRef.current = new Set();
               setNumPages(nextNumPages);
               pageRefs.current = Array(nextNumPages).fill(null);
             }}
@@ -187,6 +242,7 @@ export function PdfSourcePreview({
                 pageNumber={index + 1}
                 width={pageWidth}
                 highlights={highlightAreas.filter((area) => area.pageIndex === index)}
+                onRenderSuccess={() => markPageRendered(index)}
               />
             ))}
           </Document>
@@ -200,11 +256,13 @@ function PdfPage({
   pageNumber,
   width,
   highlights,
+  onRenderSuccess,
   refCallback,
 }: {
   pageNumber: number;
   width: number;
   highlights: PdfHighlightArea[];
+  onRenderSuccess?: () => void;
   refCallback: (element: HTMLDivElement | null) => void;
 }) {
   return (
@@ -218,6 +276,7 @@ function PdfPage({
         loading={<LoadingState label={`Seite ${pageNumber} wird geladen…`} />}
         renderAnnotationLayer
         renderTextLayer
+        onRenderSuccess={onRenderSuccess}
       />
       {highlights.length > 0 && (
         <div className="pointer-events-none absolute inset-0">

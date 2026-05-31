@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Inbox, Trash2, X } from "lucide-react";
+import { Check, Inbox, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -17,6 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/components/ui/dialog";
+import { Input } from "@/shared/components/ui/input";
+import { Label } from "@/shared/components/ui/label";
 import { UploadDropzone } from "@/features/upload/UploadDropzone";
 
 import { DashboardHero } from "./components/DashboardHero";
@@ -28,6 +30,7 @@ import {
 } from "./components/ReviewFilters";
 import { ReviewList } from "./components/ReviewList";
 import { useReviewSummaries } from "./hooks/useReviewSummaries";
+import type { ReviewSummary } from "./schemas/reviewSummary";
 
 function isWithinPreset(dateStr: string, preset: DatePreset): boolean {
   if (preset === "all") return true;
@@ -40,13 +43,17 @@ function isWithinPreset(dateStr: string, preset: DatePreset): boolean {
   return date >= cutoff;
 }
 
+function hasManualClarification(review: ReviewSummary): boolean {
+  return Boolean(review.escalation?.escalated);
+}
+
 export function DashboardPage() {
   const queryClient = useQueryClient();
   const { data: reviews, isLoading, isError, error } = useReviewSummaries();
   const [status, setStatus] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
-  const [sortBy, setSortBy] = useState<SortOption>("date_desc");
+  const [sortBy, setSortBy] = useState<SortOption>("attention");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -54,14 +61,37 @@ export function DashboardPage() {
     if (!reviews) return [];
     const q = query.trim().toLowerCase();
     const result = reviews.filter((r) => {
-      if (status !== "all" && r.status !== status) return false;
+      if (status === "manual_clarification") {
+        if (!hasManualClarification(r)) return false;
+      } else if (status !== "all" && r.status !== status) {
+        return false;
+      }
       if (!isWithinPreset(r.created_at, datePreset)) return false;
       if (!q) return true;
-      return r.subject.toLowerCase().includes(q) || r.sender.toLowerCase().includes(q);
+      return (
+        r.subject.toLowerCase().includes(q) ||
+        r.sender.toLowerCase().includes(q) ||
+        (r.escalation?.reason ?? "").toLowerCase().includes(q)
+      );
     });
 
     return [...result].sort((a, b) => {
       switch (sortBy) {
+        case "attention": {
+          // Open reviews needing work first (unmatched positions / low match
+          // rate rank highest); finished ones sink to the bottom.
+          const attentionScore = (r: typeof a) => {
+            if (hasManualClarification(r)) return 10000;
+            if (r.status === "abgeschlossen") return -1;
+            const matched = r.matches_exact + r.matches_fuzzy + r.matches_semantic;
+            const rate = r.positions === 0 ? 1 : matched / r.positions;
+            return r.matches_no_match * 100 + Math.round((1 - rate) * 50) + 1;
+          };
+          const diff = attentionScore(b) - attentionScore(a);
+          return diff !== 0
+            ? diff
+            : new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+        }
         case "date_desc":
           return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
         case "date_asc":
@@ -100,6 +130,51 @@ export function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: reviewListQueryKey });
     },
   });
+
+  // Bulk approval (fast lane): finalize each selected review. The server
+  // gate decides — reviews with blockers are rejected and stay selected so
+  // the user can open and fix them. There is no current-user in the app, so
+  // the approver name is a persisted preference.
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [approver, setApprover] = useState(
+    () => localStorage.getItem("ek.approverName") ?? "",
+  );
+  useEffect(() => {
+    localStorage.setItem("ek.approverName", approver);
+  }, [approver]);
+
+  const approveMutation = useMutation({
+    mutationFn: async (input: { reviewIds: string[]; actor: string }) => {
+      const results = await Promise.allSettled(
+        input.reviewIds.map((id) => reviewsApi.finalize(id, { actor: input.actor })),
+      );
+      const ok: string[] = [];
+      const failed: string[] = [];
+      results.forEach((result, i) =>
+        (result.status === "fulfilled" ? ok : failed).push(input.reviewIds[i]),
+      );
+      return { ok, failed };
+    },
+    onSuccess: ({ ok }) => {
+      if (ok.length > 0) {
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          ok.forEach((id) => next.delete(id));
+          return next;
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: reviewListQueryKey });
+    },
+  });
+
+  const confirmApproveSelected = () => {
+    const actor = approver.trim();
+    if (!actor || selectedReviewIds.length === 0) return;
+    approveMutation.mutate(
+      { reviewIds: selectedReviewIds, actor },
+      { onSuccess: ({ failed }) => { if (failed.length === 0) setApproveDialogOpen(false); } },
+    );
+  };
 
   const toggleReviewSelection = (reviewId: string) => {
     setSelectedIds((prev) => {
@@ -191,11 +266,27 @@ export function DashboardPage() {
           visible={selectedIds.size > 0}
           selectedCount={selectedIds.size}
           deleting={deleteMutation.isPending}
+          approving={approveMutation.isPending}
           onClear={clearSelection}
+          onApprove={() => {
+            approveMutation.reset();
+            setApproveDialogOpen(true);
+          }}
           onDelete={() => setDeleteDialogOpen(true)}
         />,
         document.body,
       )}
+      <ApproveReviewsDialog
+        open={approveDialogOpen}
+        selectedCount={selectedIds.size}
+        approver={approver}
+        onApproverChange={setApprover}
+        pending={approveMutation.isPending}
+        approvedCount={approveMutation.data?.ok.length ?? 0}
+        failedCount={approveMutation.data?.failed.length ?? 0}
+        onOpenChange={setApproveDialogOpen}
+        onConfirm={confirmApproveSelected}
+      />
     </PageContainer>
   );
 }
@@ -204,15 +295,20 @@ function BulkSelectionBar({
   visible,
   selectedCount,
   deleting,
+  approving,
   onClear,
+  onApprove,
   onDelete,
 }: {
   visible: boolean;
   selectedCount: number;
   deleting: boolean;
+  approving: boolean;
   onClear: () => void;
+  onApprove: () => void;
   onDelete: () => void;
 }) {
+  const busy = deleting || approving;
   // Bar is always mounted to avoid DOM mount/unmount reflows. Visibility
   // is toggled via opacity + pointer-events so the table never reflows
   // when a checkbox is clicked.
@@ -241,7 +337,7 @@ function BulkSelectionBar({
         type="button"
         variant="ghost"
         size="sm"
-        disabled={deleting || !visible}
+        disabled={busy || !visible}
         onClick={onClear}
       >
         <X className="h-4 w-4" aria-hidden="true" />
@@ -249,9 +345,19 @@ function BulkSelectionBar({
       </Button>
       <Button
         type="button"
+        variant="primary"
+        size="sm"
+        disabled={busy || !visible}
+        onClick={onApprove}
+      >
+        <Check className="h-4 w-4" aria-hidden="true" />
+        Freigeben
+      </Button>
+      <Button
+        type="button"
         variant="danger"
         size="sm"
-        disabled={deleting || !visible}
+        disabled={busy || !visible}
         onClick={onDelete}
       >
         <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -311,6 +417,83 @@ function DeleteReviewsDialog({
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
             {deleting ? "Lösche…" : "Endgültig löschen"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ApproveReviewsDialog({
+  open,
+  selectedCount,
+  approver,
+  onApproverChange,
+  pending,
+  approvedCount,
+  failedCount,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  selectedCount: number;
+  approver: string;
+  onApproverChange: (name: string) => void;
+  pending: boolean;
+  approvedCount: number;
+  failedCount: number;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Anfragen freigeben?</DialogTitle>
+          <DialogDescription>
+            {selectedCount} ausgewählte Anfrage
+            {selectedCount === 1 ? "" : "n"} werden freigegeben und als finales
+            Angebot erzeugt. Anfragen mit offenen Punkten werden übersprungen
+            und bleiben markiert.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs font-semibold text-foreground">
+            Freigegeben durch
+          </Label>
+          <Input
+            value={approver}
+            onChange={(e) => onApproverChange(e.target.value)}
+            placeholder="Vor- und Nachname"
+            autoComplete="name"
+          />
+        </div>
+
+        {failedCount > 0 && (
+          <p className="mt-3 rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning">
+            {approvedCount} freigegeben, {failedCount} mit offenen Punkten —
+            bitte einzeln öffnen und prüfen.
+          </p>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={pending}
+            onClick={() => onOpenChange(false)}
+          >
+            {failedCount > 0 ? "Schließen" : "Abbrechen"}
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={pending || selectedCount === 0 || approver.trim().length === 0}
+            onClick={onConfirm}
+          >
+            <Check className="h-4 w-4" aria-hidden="true" />
+            {pending ? "Freigabe läuft…" : "Freigeben"}
           </Button>
         </div>
       </DialogContent>

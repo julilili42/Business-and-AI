@@ -81,6 +81,11 @@ export async function createDraftMail(
         name: finalPdfFilename,
         url: withCacheBust(finalPdfUrl),
       },
+      ...(templates?.mail_attachments ?? []).map((attachment) => ({
+        type: "file",
+        name: attachment.name,
+        url: withCacheBust(attachment.url),
+      })),
     ],
   });
   setStatus("Angebotsmail geöffnet.");

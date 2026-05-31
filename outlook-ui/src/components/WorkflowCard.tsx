@@ -32,6 +32,7 @@ import {
   ExternalIcon,
   RefreshIcon,
   SendIcon,
+  StopIcon,
   TrashIcon,
 } from "./Icons";
 import { PrivacyInlineHelp, SecondaryActions } from "./ActionHelpers";
@@ -46,6 +47,7 @@ type WorkflowCardProps = {
   onOpenReview: () => void;
   onCreateDraftMail: () => void;
   onResetWorkflow: () => void;
+  onStopPipeline: () => void;
   onReloadMail: () => void;
   onOpenOverview: () => void;
 };
@@ -111,10 +113,17 @@ export function WorkflowCard({
   onOpenReview,
   onCreateDraftMail,
   onResetWorkflow,
+  onStopPipeline,
   onReloadMail,
   onOpenOverview,
 }: WorkflowCardProps) {
   const state = deriveState(workflow);
+  const stopped = pipelineProgress?.status === "cancelled";
+  // Stop is only meaningful while the run is genuinely in flight.
+  const canStop =
+    state === "review_running" &&
+    pipelineProgress?.status !== "failed" &&
+    pipelineProgress?.status !== "cancelled";
   const subject =
     workflow?.subject || snapshot?.subject || "Keine Mail geladen";
   const sender = workflow?.sender || snapshot?.from || "";
@@ -155,7 +164,14 @@ export function WorkflowCard({
     <section className={`${cardCls} ${failed ? "card-error" : ""}`}>
       <div className="card-stack">
         <div className="row-between">
-          <StatusPill state={state} />
+          {stopped ? (
+            <span className="pill pill-warning">
+              <span className="pill-dot" />
+              Gestoppt
+            </span>
+          ) : (
+            <StatusPill state={state} />
+          )}
           {workflow?.reviewId && (
             <code className="review-id" title="Review-ID">
               {workflow.reviewId}
@@ -240,18 +256,27 @@ export function WorkflowCard({
 
           {state === "review_running" && (
             <SecondaryActions>
-              <OverviewAction
-                disabled={loading}
-                onOpenOverview={onOpenOverview}
-              />
+              {canStop && (
+                <button
+                  className="btn btn-danger-ghost"
+                  disabled={!workflow?.reviewId}
+                  onClick={onStopPipeline}
+                >
+                  <StopIcon className="btn-icon" />
+                  Pipeline stoppen
+                </button>
+              )}
               <button
                 className="btn btn-ghost"
-                disabled={loading}
                 onClick={onResetWorkflow}
               >
-                <TrashIcon className="btn-icon" />
+                <RefreshIcon className="btn-icon" />
                 Neu starten
               </button>
+              <OverviewAction
+                disabled={false}
+                onOpenOverview={onOpenOverview}
+              />
             </SecondaryActions>
           )}
 
@@ -375,6 +400,8 @@ export function WorkflowCard({
 
 function PipelineInline({ progress }: { progress: PipelineProgress }) {
   const failed = progress.status === "failed";
+  const cancelled = progress.status === "cancelled";
+  const terminal = failed || cancelled;
   const steps = Array.isArray(progress.steps) ? progress.steps : [];
   const percent =
     typeof progress.progress_percent === "number"
@@ -386,10 +413,16 @@ function PipelineInline({ progress }: { progress: PipelineProgress }) {
       <div className="pipeline-inline-current">
         <span
           className={
-            failed ? "pipeline-inline-icon-error" : "pipeline-inline-icon-running"
+            terminal ? "pipeline-inline-icon-error" : "pipeline-inline-icon-running"
           }
         >
-          {failed ? <AlertIcon size={14} /> : <RefreshIcon size={14} />}
+          {failed ? (
+            <AlertIcon size={14} />
+          ) : cancelled ? (
+            <StopIcon size={14} />
+          ) : (
+            <RefreshIcon size={14} />
+          )}
         </span>
         <span className="pipeline-inline-text">
           {progress.current_step || "Pipeline"}

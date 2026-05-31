@@ -32,7 +32,7 @@ export function StammdatenPage() {
 
   return (
     <PageContainer>
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <header className="mb-8">
         <div>
           <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
             Stammdaten<span className="text-brand">.</span>

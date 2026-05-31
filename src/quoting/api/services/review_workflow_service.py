@@ -286,6 +286,7 @@ class ReviewWorkflowService:
                 "status": s.status,
                 "has_pdf": bool(s.pdf_path),
                 "manual_overrides_count": s.manual_overrides_count,
+                "escalation": s.escalation,
                 "extracted_articles": s.extracted_articles,
             }
             for s in summaries
@@ -319,7 +320,7 @@ class ReviewWorkflowService:
             review_data=self.review_data_service,
         ).execute(review_id, payload)
 
-    def regenerate_quotation(self, review_id: str) -> dict:
+    def regenerate_quotation(self, review_id: str, *, build_pdf: bool = True) -> dict:
         return RegenerateQuotationUseCase(
             repo=self.repo,
             pipeline=self.pipeline,
@@ -328,7 +329,7 @@ class ReviewWorkflowService:
             review_data=self.review_data_service,
             quotation_builder=self.quotation_builder,
             pdf_builder=self.pdf_builder,
-        ).execute(review_id)
+        ).execute(review_id, build_pdf=build_pdf)
 
     def finalize_quotation(
         self,

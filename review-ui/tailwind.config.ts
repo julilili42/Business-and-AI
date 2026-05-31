@@ -10,6 +10,7 @@ import animate from "tailwindcss-animate";
  * a CSS-only change later on.
  */
 const config: Config = {
+  darkMode: "class",
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     container: {

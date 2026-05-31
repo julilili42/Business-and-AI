@@ -108,7 +108,7 @@ export function Breadcrumb({
               node.active
                 ? isApproved
                   ? "border-success/30 bg-success-soft text-success"
-                  : "border-brand/30 bg-brand-soft text-brand-dark"
+                  : "border-brand/40 bg-brand-soft text-brand"
                 : "border-border bg-muted text-muted-foreground",
             )}
           >

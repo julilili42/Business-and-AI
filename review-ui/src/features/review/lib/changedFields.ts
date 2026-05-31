@@ -24,6 +24,9 @@ const POSITION_FIELDS = [
   "zeichnungsnummer",
   "abmessungen",
   "gewicht_stueck_kg",
+  "gewicht_netto_kg",
+  "gewicht_brutto_kg",
+  "verpackungsart",
   "ist_zertifikat",
 ] as const satisfies readonly (keyof Position)[];
 

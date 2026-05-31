@@ -85,6 +85,13 @@ def test_prompt_contains_customer_and_position(sample_anfrage: Anfrage):
     assert "[Absender]" in prompt
 
 
+def test_prompt_forbids_non_quotation_attachments_de(sample_anfrage: Anfrage):
+    quotation = _quotation([_item(bez="Abnahmeprüfzeugnis 3.1")], 95.0)
+    prompt = build_reply_body_prompt(sample_anfrage, quotation, style_hint="", language="de")
+    assert "keine weiteren Anhänge außer dem Angebots-PDF" in prompt
+    assert "Positionen (Angebotspositionen, keine E-Mail-Anhänge)" in prompt
+
+
 def test_prompt_includes_style_hint_when_provided(sample_anfrage: Anfrage):
     quotation = _quotation([_item()], 300.0)
     prompt = build_reply_body_prompt(
@@ -107,6 +114,7 @@ def test_prompt_english_variant(sample_anfrage: Anfrage):
     assert "Response:" in prompt
     assert "Dear Sir or Madam" in prompt
     assert "Best regards" in prompt
+    assert "Do not claim any attachments other than the quotation PDF" in prompt
 
 
 def test_generate_reply_body_strips_response_artifact(sample_anfrage: Anfrage):
@@ -168,6 +176,73 @@ def test_generate_reply_body_unescapes_literal_newlines(sample_anfrage: Anfrage)
     assert body.endswith("Grüßen\n[Absender]")
 
 
+def test_generate_reply_body_unwraps_json_email_body_and_formats_layout(
+    sample_anfrage: Anfrage,
+):
+    quotation = _quotation([_item()], 300.0)
+    llm = _StubLLM(
+        '{"email_body": "Sehr geehrter Herr Hochstein,\\n'
+        'vielen Dank für Ihre Anfrage. Anbei erhalten Sie unser Angebot als PDF.\\n'
+        'Sollten Sie Fragen haben, melden Sie sich gern.\\n'
+        'Mit freundlichen Grüßen\\nJulian Jurcevic"}'
+    )
+
+    body, _ = generate_reply_body(
+        anfrage=sample_anfrage,
+        quotation=quotation,
+        mail_body="Sehr geehrte Damen, bitte um Angebot.",
+        style_hint="",
+        llm=llm,
+    )
+
+    assert not body.startswith("{")
+    assert "email_body" not in body
+    assert body.startswith("Sehr geehrter Herr Hochstein,\n\nvielen Dank")
+    assert "gern.\n\nMit freundlichen Grüßen\nJulian Jurcevic" in body
+
+
+def test_generate_reply_body_rejects_certificate_attachment_claim(
+    sample_anfrage: Anfrage,
+):
+    quotation = _quotation([_item(bez="Abnahmeprüfzeugnis 3.1")], 95.0)
+    llm = _StubLLM(
+        "Sehr geehrter Herr Hochstein,\n\n"
+        "vielen Dank für Ihre Anfrage. Anbei sende ich Ihnen das gewünschte Angebot "
+        "für die Gleitstücke sowie das Abnahmeprüfzeugnis als PDF-Anhang.\n\n"
+        "Mit freundlichen Grüßen\n[Absender]"
+    )
+
+    with pytest.raises(RuntimeError, match="unsupported attachment claim"):
+        generate_reply_body(
+            anfrage=sample_anfrage,
+            quotation=quotation,
+            mail_body="Sehr geehrte Damen, bitte um Angebot.",
+            style_hint="",
+            llm=llm,
+        )
+
+
+def test_generate_reply_body_rejects_drawing_follow_up_wording(
+    sample_anfrage: Anfrage,
+):
+    quotation = _quotation([_item()], 300.0)
+    llm = _StubLLM(
+        "Sehr geehrter Herr Hochstein,\n\n"
+        "vielen Dank für Ihre Anfrage. Anbei erhalten Sie unser Angebot als PDF. "
+        "Die aktuell gültigen Zeichnungen reichen wir separat nach.\n\n"
+        "Mit freundlichen Grüßen\n[Absender]"
+    )
+
+    with pytest.raises(RuntimeError, match="drawing follow-up"):
+        generate_reply_body(
+            anfrage=sample_anfrage,
+            quotation=quotation,
+            mail_body="Sehr geehrte Damen, bitte um Angebot.",
+            style_hint="",
+            llm=llm,
+        )
+
+
 def test_prompt_includes_acknowledged_requirements_de(sample_anfrage: Anfrage):
     quotation = _quotation([_item()], 300.0)
     acks = [
@@ -180,10 +255,33 @@ def test_prompt_includes_acknowledged_requirements_de(sample_anfrage: Anfrage):
         style_hint="",
         language="de",
         acknowledged_requirements=acks,
+        outgoing_attachment_names=["Zeichnung 01Z3.pdf"],
     )
-    assert "Sonderwünsche" in prompt
-    assert "Zeichnung Pos 30 beilegen" in prompt
-    assert "Material-Zertifikat 3.1" in prompt
+    assert "bestätigte Aufgaben aus der Anfrage" in prompt
+    assert "[Zeichnung, Pos. 30] Zeichnung Pos 30 beilegen" in prompt
+    assert "[Zertifikat] Material-Zertifikat 3.1" in prompt
+    assert "Mail-Body-Leitplanken" in prompt
+    assert "Die aktuell gültigen Zeichnungen erhalten Sie ebenfalls mit dieser E-Mail" in prompt
+    assert "nicht, dass Zeichnungen separat oder später nachgereicht werden" in prompt
+    assert "niemals als angehängte oder beigelegte Datei" in prompt
+    assert "Zeichnung 01Z3.pdf" in prompt
+
+
+def test_prompt_omits_drawing_promise_without_extra_attachments(
+    sample_anfrage: Anfrage,
+):
+    quotation = _quotation([_item()], 300.0)
+    acks = [Anforderung(text="Zeichnung beilegen", kategorie="zeichnung")]
+    prompt = build_reply_body_prompt(
+        sample_anfrage,
+        quotation,
+        style_hint="",
+        language="de",
+        acknowledged_requirements=acks,
+    )
+    assert "Zusatzanhänge für diese Angebotsmail:\n- keine" in prompt
+    assert "Nicht im Mailtext erwähnen" in prompt
+    assert "erhalten Sie ebenfalls mit dieser E-Mail" not in prompt
 
 
 def test_prompt_includes_acknowledged_requirements_en(sample_anfrage: Anfrage):
@@ -195,9 +293,11 @@ def test_prompt_includes_acknowledged_requirements_en(sample_anfrage: Anfrage):
         style_hint="",
         language="en",
         acknowledged_requirements=acks,
+        outgoing_attachment_names=["drawing.pdf"],
     )
-    assert "Special requests" in prompt
-    assert "Include drawing for pos 30" in prompt
+    assert "Customer tasks confirmed by Sales" in prompt
+    assert "[drawing] Include drawing for pos 30" in prompt
+    assert "You will also receive the current drawings with this email" in prompt
 
 
 def test_prompt_omits_ack_block_when_none(sample_anfrage: Anfrage):

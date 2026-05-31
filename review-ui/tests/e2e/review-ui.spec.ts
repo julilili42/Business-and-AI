@@ -46,9 +46,10 @@ test("hides draft PDF downloads for reviews that still need approval", async ({ 
   await page.goto("/");
 
   await expect(page.getByText("Preisanfrage 2026-50422")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Review" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "PDF öffnen" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "PDF" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Review Preisanfrage 2026-50422/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Review", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "PDF öffnen", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "PDF", exact: true })).toHaveCount(0);
 });
 
 test("does not count a newly added position after it is deleted again", async ({ page }) => {
@@ -117,6 +118,7 @@ test("leaves fullscreen comparison with Escape", async ({ page }) => {
   await page.getByRole("button", { name: "Vollbild" }).click();
   await expect(page).toHaveURL(/focus=1/);
   await expect(page.getByRole("button", { name: "Vollbild verlassen" })).toBeVisible();
+  await expect(page.getByText("Anforderungen & Freigabe")).toHaveCount(0);
 
   await page.keyboard.press("Escape");
 
@@ -129,7 +131,7 @@ test("finalizes an approved draft and shows the final offer state", async ({ pag
 
   await expect(page.getByText(/Versandbereit/i)).toBeVisible();
   const summary = page.locator("section[aria-labelledby='approval-summary-heading']");
-  await expect(page.getByRole("heading", { name: "Abschluss & Freigabe" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Anforderungen & Freigabe" })).toBeVisible();
   await expect(summary.getByText(/2\.447,50/).first()).toBeVisible();
   await page.getByPlaceholder("Vor- und Nachname").fill("Demo User");
   await page.getByRole("button", { name: "Freigeben" }).click();

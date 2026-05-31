@@ -27,7 +27,11 @@ export type PipelineStepProgress = {
   updated_at: string | null;
 };
 
-export type PipelineProgressStatus = "running" | "completed" | "failed";
+export type PipelineProgressStatus =
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 export type PipelineProgress = {
   review_id: string;

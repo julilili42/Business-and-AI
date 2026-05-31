@@ -68,14 +68,18 @@ def build_quotation(
     warnungen: list[str] = []
     total = 0.0
 
-    if len(anfrage.positionen) != len(matches):
-        log.warning(
-            "Position/match count mismatch: %d positions vs %d matches — "
-            "trailing items will be silently dropped by zip.",
-            len(anfrage.positionen),
-            len(matches),
-        )
-    for pos, match in zip(anfrage.positionen, matches, strict=False):
+    # Join on pos_nr rather than position so a count/order mismatch can never
+    # silently drop a line item. Every position gets an item; a position
+    # without a match falls back to no_match (and is flagged downstream).
+    matches_by_pos = {match.pos_nr: match for match in matches}
+    for pos in anfrage.positionen:
+        match = matches_by_pos.get(pos.pos_nr)
+        if match is None:
+            log.warning(
+                "No match for position %d in review — defaulting to no_match.",
+                pos.pos_nr,
+            )
+            match = MatchResult(pos_nr=pos.pos_nr, status="no_match", score=0.0)
         item, warnings = _build_item(pos, match, price_overrides)
         items.append(item)
         warnungen.extend(warnings)

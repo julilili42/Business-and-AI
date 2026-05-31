@@ -15,6 +15,13 @@ export const reviewStatusSchema = z.enum([
 
 export type ReviewStatus = z.infer<typeof reviewStatusSchema>;
 
+export const reviewEscalationSchema = z.object({
+  escalated: z.boolean(),
+  reason: z.string(),
+  actor: z.string().nullable().optional(),
+  at: z.string(),
+});
+
 export const reviewSummarySchema = z.object({
   review_id: z.string(),
   created_at: z.string(),
@@ -34,6 +41,7 @@ export const reviewSummarySchema = z.object({
   status: reviewStatusSchema,
   has_pdf: z.boolean(),
   manual_overrides_count: z.number().int(),
+  escalation: reviewEscalationSchema.nullable().default(null),
   extracted_articles: z.array(z.string()).default([]),
 });
 

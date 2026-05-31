@@ -41,7 +41,7 @@ class RegenerateQuotationUseCase:
     quotation_builder: QuotationBuilder
     pdf_builder: PdfBuilder
 
-    def execute(self, review_id: str) -> dict:
+    def execute(self, review_id: str, *, build_pdf: bool = True) -> dict:
         folder = review_dir(self.repo, review_id)
         anfrage, matches, overrides = load_review_data_for_use_case(
             review_id,
@@ -59,28 +59,33 @@ class RegenerateQuotationUseCase:
             review_id,
         )
 
-        pdf_path = folder / draft_pdf_filename(review_id)
-        try:
-            self.pdf_builder(
-                anfrage,
-                quotation,
-                pdf_path,
-                is_final=False,
-                company_profile=company_profile,
-            )
-        except Exception as exc:
-            log.exception("regenerate: PDF build failed for %s", review_id)
-            raise UseCaseUnprocessable(
-                f"PDF-Erstellung fehlgeschlagen: {exc}"
-            ) from exc
+        # The draft PDF is only ever viewed on the approval step. Editing
+        # steps skip it (build_pdf=False) and just persist the repriced
+        # quotation; the PDF is rebuilt when the user reaches approval.
+        if build_pdf:
+            pdf_path = folder / draft_pdf_filename(review_id)
+            try:
+                self.pdf_builder(
+                    anfrage,
+                    quotation,
+                    pdf_path,
+                    is_final=False,
+                    company_profile=company_profile,
+                )
+            except Exception as exc:
+                log.exception("regenerate: PDF build failed for %s", review_id)
+                raise UseCaseUnprocessable(
+                    f"PDF-Erstellung fehlgeschlagen: {exc}"
+                ) from exc
 
-        self.repo.register_document(
-            review_id,
-            kind="draft_pdf",
-            path=pdf_path,
-            filename=pdf_path.name,
-            content_type="application/pdf",
-        )
+            self.repo.register_document(
+                review_id,
+                kind="draft_pdf",
+                path=pdf_path,
+                filename=pdf_path.name,
+                content_type="application/pdf",
+            )
+
         self.repo.save_quotation_reviewed(review_id, quotation.to_dict())
         return quotation.to_dict()
 

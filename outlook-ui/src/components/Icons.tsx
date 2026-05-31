@@ -42,6 +42,12 @@ export const RefreshIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const StopIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3.5" y="3.5" width="9" height="9" rx="1.5" />
+  </Icon>
+);
+
 export const CheckIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M3 8.5L6.5 12 13 4.5" />

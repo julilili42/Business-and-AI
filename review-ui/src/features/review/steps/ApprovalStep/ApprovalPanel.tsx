@@ -5,6 +5,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { useReviewUiStore } from "@/features/review/stores/reviewUiStore";
+import { ApiError } from "@/shared/api/client";
 import type { ApprovalRecord } from "@/shared/schemas/approval";
 import { isApproved } from "@/shared/schemas/approval";
 import { cn } from "@/shared/lib/cn";
@@ -307,9 +308,7 @@ export function ApprovalPanel({
       )}
 
       {finalize.isError && (
-        <p className={cn("text-xs text-danger", embedded && "lg:col-span-3")}>
-          Final-PDF konnte nicht erzeugt werden.
-        </p>
+        <FinalizeError error={finalize.error} embedded={embedded} />
       )}
       {transition.isError && (
         <p className={cn("text-xs text-danger", embedded && "lg:col-span-3")}>
@@ -328,4 +327,46 @@ export function ApprovalPanel({
       {form}
     </section>
   );
+}
+
+/**
+ * Finalize can be rejected server-side even when the client gate looked
+ * clean (the two gates are independent implementations). When that
+ * happens the server returns its own quality gate in the 409 body — we
+ * surface its blockers verbatim instead of a generic error so the user
+ * knows exactly what to fix.
+ */
+function FinalizeError({ error, embedded }: { error: unknown; embedded?: boolean }) {
+  const serverBlockers = extractServerBlockers(error);
+  return (
+    <div
+      className={cn(
+        "rounded-md border border-danger/40 bg-danger-soft p-2.5 text-xs text-foreground",
+        embedded && "lg:col-span-3",
+      )}
+      role="alert"
+    >
+      {serverBlockers.length > 0 ? (
+        <>
+          <strong>Freigabe vom Server abgelehnt:</strong>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {serverBlockers.map((title) => (
+              <li key={title}>{title}</li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <span>Final-PDF konnte nicht erzeugt werden. Bitte erneut versuchen.</span>
+      )}
+    </div>
+  );
+}
+
+function extractServerBlockers(error: unknown): string[] {
+  if (!(error instanceof ApiError) || error.status !== 409) return [];
+  const body = error.body as
+    | { detail?: { quality_gate?: { blockers?: Array<{ title?: string }> } } }
+    | undefined;
+  const blockers = body?.detail?.quality_gate?.blockers ?? [];
+  return blockers.map((b) => b.title ?? "").filter((title) => title.length > 0);
 }

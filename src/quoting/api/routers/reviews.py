@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 
@@ -28,11 +31,33 @@ from quoting.api.settings_store import load_user_settings
 from quoting.core import Anfrage
 from quoting.extraction.llm import build_llm
 from quoting.output import build_draft_pdf
-from quoting.output.reply_body_prompt import generate_reply_body
+from quoting.output.reply_body_prompt import detect_language, generate_reply_body
 from quoting.pipeline import QuotingPipeline
 from quoting.pricing import Quotation, QuotationItem
 
+log = logging.getLogger("quoting.frontend_router")
+
 router = APIRouter()
+
+
+def _fallback_reply_body(language: str) -> str:
+    """Template cover note used when the LLM is unavailable.
+
+    Keeps the last step of the workflow working even if the model errors —
+    the user can still create the Outlook reply, just without the
+    contextual phrasing.
+    """
+    if language == "en":
+        return (
+            "Dear Sir or Madam,\n\n"
+            "thank you for your inquiry. Please find our quotation attached as a PDF.\n\n"
+            "Best regards\n[Absender]"
+        )
+    return (
+        "Sehr geehrte Damen und Herren,\n\n"
+        "vielen Dank für Ihre Anfrage. Anbei erhalten Sie unser Angebot als PDF.\n\n"
+        "Mit freundlichen Grüßen\n[Absender]"
+    )
 
 
 def _format_mail_dict(mail_meta: dict) -> dict:
@@ -166,7 +191,17 @@ class RequirementsAckRequest(BaseModel):
 
 @router.put("/reviews/{review_id}/requirements-ack")
 def put_requirements_ack(review_id: str, payload: RequirementsAckRequest) -> dict:
-    """Persist which extracted requirements have been acknowledged by the user."""
+    """Persist which extracted requirements have been acknowledged by the user.
+
+    Acknowledgments are stored by positional index. This is safe because the
+    only path that changes a review's ``anforderungen`` is re-extraction, which
+    runs exclusively via reset — and reset wipes every payload except the mail
+    (``reset_review_state(keep={MAIL})``), clearing these acknowledgments too.
+    So indices can never silently re-point at a different requirement. The
+    range check below additionally rejects stale/out-of-range indices, and the
+    quality gate fails safe (an unmatched index simply leaves a requirement
+    unacknowledged, blocking approval rather than waving it through).
+    """
     _common.require_review(review_id)
     repo = _common.get_review_repo()
 
@@ -184,10 +219,16 @@ def put_requirements_ack(review_id: str, payload: RequirementsAckRequest) -> dic
 
 
 @router.post("/reviews/{review_id}/regenerate", response_model=QuotationModel)
-def regenerate_quotation(review_id: str) -> dict:
+def regenerate_quotation(review_id: str, build_pdf: bool = True) -> dict:
+    """Recompute prices (and optionally rebuild the draft PDF).
+
+    During editing the UI passes ``build_pdf=false`` so each keystroke-blur
+    only reprices (cheap); the draft PDF — only ever shown on the approval
+    step — is rebuilt once when the user gets there.
+    """
     _common.require_review(review_id)
     return _common.run_use_case(
-        lambda: _workflow_service().regenerate_quotation(review_id)
+        lambda: _workflow_service().regenerate_quotation(review_id, build_pdf=build_pdf)
     )
 
 
@@ -228,6 +269,11 @@ def get_reply_body(review_id: str) -> ReplyBodyResponse:
         for idx, req in enumerate(anfrage.anforderungen)
         if idx in acknowledged_indices
     ]
+    outgoing_attachment_names = [
+        str(doc.get("filename") or "")
+        for doc in repo.list_documents(review_id, kind="mail_attachment")
+        if str(doc.get("filename") or "").strip()
+    ]
 
     workflow = load_user_settings().workflow
     style_hint = workflow.llm_email_body_style_hint or ""
@@ -248,6 +294,7 @@ def get_reply_body(review_id: str) -> ReplyBodyResponse:
             style_hint=style_hint,
             llm=llm,
             acknowledged_requirements=acknowledged_requirements,
+            outgoing_attachment_names=outgoing_attachment_names,
             usage_callback=lambda usage: repo.record_llm_usage(
                 review_id,
                 source="reply_body",
@@ -256,7 +303,17 @@ def get_reply_body(review_id: str) -> ReplyBodyResponse:
             ),
         )
     except Exception as exc:
-        raise HTTPException(503, f"Reply-body generation failed: {exc}") from exc
+        log.warning(
+            "Reply-body generation failed for %s; using template fallback: %s",
+            review_id,
+            exc,
+        )
+        language = detect_language(str(mail.get("body") or ""))
+        return ReplyBodyResponse(
+            body=_fallback_reply_body(language),
+            language=language,
+            model="fallback",
+        )
 
     return ReplyBodyResponse(body=body, language=language, model=model_name)
 
@@ -273,3 +330,59 @@ def finalize_quotation(review_id: str, payload: FinalizeRequest) -> dict:
             exception_reason=payload.exception_reason,
         )
     )
+
+
+class EscalateRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=1000)
+    actor: str | None = None
+
+
+@router.post("/reviews/{review_id}/escalate")
+def escalate_review(review_id: str, payload: EscalateRequest) -> dict:
+    """Flag a review for hand-off to Engineering/Plant (the as-is branch for
+    inquiries Sales cannot answer automatically). Keeps the review and its
+    audit trail; reset clears the flag like any other pipeline output.
+    """
+    _common.require_review(review_id)
+    repo = _common.get_review_repo()
+    record = {
+        "escalated": True,
+        "reason": payload.reason.strip(),
+        "actor": (payload.actor or "").strip() or None,
+        "at": datetime.now(timezone.utc).isoformat(),
+    }
+    repo.save_escalation(review_id, record)
+    return record
+
+
+@router.delete("/reviews/{review_id}/escalate", status_code=204)
+def clear_escalation(review_id: str) -> Response:
+    """Withdraw an escalation (back to normal review)."""
+    _common.require_review(review_id)
+    _common.get_review_repo().delete_payload(review_id, "escalation")
+    return Response(status_code=204)
+
+
+@router.post("/reviews/{review_id}/cancel")
+def cancel_pipeline(review_id: str) -> dict:
+    """Stop a running pipeline. Cooperative: drops queued steps and flags the
+    run cancelled so the coordinator won't enqueue the next step. A step that
+    is already executing finishes, but nothing further runs. No-op if the run
+    isn't currently in progress.
+    """
+    _common.require_review(review_id)
+    container = _common.get_container()
+    repo = _common.get_review_repo()
+    progress_store = container.progress_store(repo)
+
+    current = progress_store.read(review_id) or {}
+    if current.get("status") != "running":
+        return {
+            "review_id": review_id,
+            "status": current.get("status"),
+            "removed_jobs": 0,
+        }
+
+    removed = container.job_queue(repo).cancel_pending(review_id)
+    progress_store.cancel(review_id)
+    return {"review_id": review_id, "status": "cancelled", "removed_jobs": removed}

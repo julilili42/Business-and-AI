@@ -13,6 +13,8 @@ from pathlib import Path
 
 from .sqlite_repository import SQLiteReviewRepository, get_default_repository
 
+_APPROVED_STATES = {"approved", "ready_to_send"}
+
 
 def draft_pdf_filename(review_id: str) -> str:
     return f"Angebot_Draft_{review_id}.pdf"
@@ -37,7 +39,11 @@ def find_final_pdf(
     repo: SQLiteReviewRepository | None = None,
 ) -> Path | None:
     """Locate the final (approved) PDF for a review, or ``None``."""
-    return _registered_pdf(review_id, "final_pdf", repo=repo)
+    active_repo = repo or get_default_repository()
+    approval = active_repo.load_approval(review_id) or {}
+    if approval.get("state") not in _APPROVED_STATES:
+        return None
+    return _registered_pdf(review_id, "final_pdf", repo=active_repo)
 
 
 def find_current_pdf(

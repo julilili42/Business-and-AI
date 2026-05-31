@@ -5,12 +5,16 @@ import {
   FileSearch,
   Info,
   Package,
+  Paperclip,
   Truck,
+  X,
   type LucideIcon,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, type ChangeEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import type { OutgoingMailAttachment } from "@/shared/api/reviews";
+import { Button, buttonVariants } from "@/shared/components/ui/button";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { cn } from "@/shared/lib/cn";
 import type {
@@ -18,11 +22,16 @@ import type {
   AnforderungKategorie,
 } from "@/shared/schemas/anfrage";
 
-import { useAcknowledgeRequirements } from "../../hooks/useReviewMutations";
+import {
+  useAcknowledgeRequirements,
+  useDeleteMailAttachment,
+  useUploadMailAttachment,
+} from "../../hooks/useReviewMutations";
 
 interface RequirementsChecklistProps {
   anforderungen: Anforderung[];
   acknowledgedIndices: number[];
+  mailAttachments: OutgoingMailAttachment[];
 }
 
 interface RequirementGroup {
@@ -105,12 +114,20 @@ const REQUIREMENT_RULES: RequirementRule[] = [
   },
 ];
 
+const ATTACHMENT_SOLVABLE_CATEGORIES = new Set<AnforderungKategorie>([
+  "zeichnung",
+  "zertifikat",
+]);
+
 export function RequirementsChecklist({
   anforderungen,
   acknowledgedIndices,
+  mailAttachments,
 }: RequirementsChecklistProps) {
   const { reviewId } = useParams<{ reviewId: string }>();
-  const mutate = useAcknowledgeRequirements(reviewId);
+  const acknowledge = useAcknowledgeRequirements(reviewId);
+  const upload = useUploadMailAttachment(reviewId);
+  const remove = useDeleteMailAttachment(reviewId);
 
   const ackSet = useMemo(() => new Set(acknowledgedIndices), [acknowledgedIndices]);
   const groups = useMemo(
@@ -127,19 +144,22 @@ export function RequirementsChecklist({
       if (groupIsAcked) next.delete(idx);
       else next.add(idx);
     });
-    mutate.mutate(Array.from(next).sort((a, b) => a - b));
+    acknowledge.mutate(Array.from(next).sort((a, b) => a - b));
   };
+
+  const uploadFiles = (files: FileList | File[]) => {
+    Array.from(files).forEach((file) => upload.mutate(file));
+  };
+
+  const firstAttachmentGroupId = groups.find(canUseMailAttachment)?.id ?? null;
 
   return (
     <div
       id="requirements-checklist"
       className="scroll-mt-24 overflow-hidden rounded-md border border-border bg-surface"
     >
-      <div className="flex items-center justify-between gap-2 bg-muted px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-        <span>Zu berücksichtigen im Angebot</span>
-        <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-muted-foreground">
-          aus Anfrage
-        </span>
+      <div className="flex items-center bg-muted px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        <span>Angebotsanforderungen</span>
       </div>
       <ul className="divide-y divide-border bg-surface">
         {groups.map((group) => {
@@ -153,6 +173,14 @@ export function RequirementsChecklist({
               checked={checked}
               indeterminate={indeterminate}
               onToggle={() => toggle(group)}
+              reviewId={reviewId}
+              attachments={mailAttachments}
+              showAttachmentList={group.id === firstAttachmentGroupId}
+              onUploadFiles={uploadFiles}
+              onRemoveAttachment={(fileName) => remove.mutate(fileName)}
+              uploadPending={upload.isPending}
+              removePending={remove.isPending}
+              attachmentError={upload.isError || remove.isError}
             />
           );
         })}
@@ -166,14 +194,42 @@ function RequirementRow({
   checked,
   indeterminate,
   onToggle,
+  reviewId,
+  attachments,
+  showAttachmentList,
+  onUploadFiles,
+  onRemoveAttachment,
+  uploadPending,
+  removePending,
+  attachmentError,
 }: {
   group: RequirementGroup;
   checked: boolean;
   indeterminate: boolean;
   onToggle: () => void;
+  reviewId?: string;
+  attachments: OutgoingMailAttachment[];
+  showAttachmentList: boolean;
+  onUploadFiles: (files: FileList | File[]) => void;
+  onRemoveAttachment: (fileName: string) => void;
+  uploadPending: boolean;
+  removePending: boolean;
+  attachmentError: boolean;
 }) {
   const meta = KATEGORIE_META[group.category] ?? KATEGORIE_META.sonstige;
   const Icon = meta.icon;
+  const uploadable = canUseMailAttachment(group);
+  const disabled = !reviewId || uploadPending;
+  const inputId = reviewId
+    ? `mail-attachment-${reviewId}-${group.id}`
+    : `mail-attachment-${group.id}`;
+
+  const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { files } = event.currentTarget;
+    if (files?.length) onUploadFiles(files);
+    event.currentTarget.value = "";
+  };
+
   return (
     <li className="flex items-start gap-2 px-3 py-1.5">
       <Checkbox
@@ -186,26 +242,53 @@ function RequirementRow({
       <Icon
         className={cn(
           "mt-0.5 h-3.5 w-3.5 shrink-0",
-          checked ? "text-success" : "text-muted-foreground",
+          checked ? "text-ek-blue" : "text-muted-foreground",
         )}
         aria-hidden="true"
       />
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span
-            className={cn(
-              "text-sm font-semibold leading-tight",
-              checked ? "text-muted-foreground" : "text-foreground",
-            )}
-          >
-            {group.title}
-          </span>
-          <span className="rounded-full bg-muted/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {meta.label}
-          </span>
-          {group.posNrs.map((posNr) => (
-            <PositionLink key={posNr} posNr={posNr} />
-          ))}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <span
+              className={cn(
+                "text-sm font-semibold leading-tight",
+                checked ? "text-muted-foreground" : "text-foreground",
+              )}
+            >
+              {group.title}
+            </span>
+            <span className="rounded-full bg-muted/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {meta.label}
+            </span>
+            {group.posNrs.map((posNr) => (
+              <PositionLink key={posNr} posNr={posNr} />
+            ))}
+          </div>
+          {uploadable && (
+            <>
+              <label
+                htmlFor={disabled ? undefined : inputId}
+                aria-disabled={disabled}
+                title={attachmentButtonLabel(group.category)}
+                className={cn(
+                  buttonVariants({ variant: "secondary", size: "sm" }),
+                  "h-7 shrink-0 cursor-pointer px-2 text-[11px]",
+                  disabled && "pointer-events-none opacity-50",
+                )}
+              >
+                <Paperclip className="h-3.5 w-3.5" aria-hidden="true" />
+                {uploadPending ? "Upload..." : "Anhängen"}
+              </label>
+              <input
+                id={inputId}
+                type="file"
+                multiple
+                className="sr-only"
+                onChange={onFileChange}
+                disabled={disabled}
+              />
+            </>
+          )}
         </div>
         {group.sourceQuotes.length > 0 && (
           <details className="group mt-0.5">
@@ -228,9 +311,48 @@ function RequirementRow({
             </ul>
           </details>
         )}
+        {showAttachmentList && attachments.length > 0 && (
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {attachments.map((attachment) => (
+              <li
+                key={attachment.name}
+                className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-1 text-[11px] text-muted-foreground"
+              >
+                <Paperclip className="h-3 w-3 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 truncate">{attachment.name}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={removePending}
+                  onClick={() => onRemoveAttachment(attachment.name)}
+                  title="Zusatzanhang entfernen"
+                  className="h-4 w-4 shrink-0 rounded-sm p-0"
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {showAttachmentList && attachmentError && (
+          <p className="mt-1 text-[11px] text-danger">
+            Zusatzanhang konnte nicht aktualisiert werden.
+          </p>
+        )}
       </div>
     </li>
   );
+}
+
+function canUseMailAttachment(group: RequirementGroup) {
+  return ATTACHMENT_SOLVABLE_CATEGORIES.has(group.category);
+}
+
+function attachmentButtonLabel(category: AnforderungKategorie) {
+  if (category === "zeichnung") return "Zeichnung anhängen";
+  if (category === "zertifikat") return "Dokument anhängen";
+  return "Anhang hinzufügen";
 }
 
 function createRequirementGroups(anforderungen: Anforderung[]) {

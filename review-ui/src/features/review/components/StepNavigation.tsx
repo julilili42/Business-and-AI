@@ -72,7 +72,12 @@ export function StepNavigation({
           <div>
             {next ? (
               <div className="group relative">
-                <Button variant="primary" disabled={disabled} onClick={goNext}>
+                <Button
+                  variant="brand"
+                  className="dark:text-background dark:hover:bg-brand"
+                  disabled={disabled}
+                  onClick={goNext}
+                >
                   {forwardLabel}
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Button>
@@ -80,7 +85,11 @@ export function StepNavigation({
               </div>
             ) : onFinish ? (
               <div className="group relative">
-                <Button variant="primary" onClick={onFinish}>
+                <Button
+                  variant="brand"
+                  className="dark:text-background dark:hover:bg-brand"
+                  onClick={onFinish}
+                >
                   {finishLabel}
                 </Button>
                 <ShortcutHint keys={["Alt", "→"]} placement="top" />

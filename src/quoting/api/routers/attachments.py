@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 import math
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
+from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -24,6 +25,8 @@ router = APIRouter()
 
 
 _PREVIEW_ROW_CAP = 500
+_MAX_MAIL_ATTACHMENT_BYTES = 25 * 1024 * 1024
+_MAIL_ATTACHMENT_KIND = "mail_attachment"
 
 
 def _resolve_review_attachment(review_id: str, filename: str) -> Path:
@@ -38,6 +41,46 @@ def _resolve_review_attachment(review_id: str, filename: str) -> Path:
     if path is None:
         raise HTTPException(404, f"Attachment '{safe_name}' not found")
     return path
+
+
+def _resolve_mail_attachment(review_id: str, filename: str) -> Path:
+    safe_name = _safe_filename(filename)
+    doc = _common.get_review_repo().current_document(
+        review_id, kind=_MAIL_ATTACHMENT_KIND, filename=safe_name
+    )
+    path = _document_path(doc)
+    if path is None:
+        raise HTTPException(404, f"Mail attachment '{safe_name}' not found")
+    return path
+
+
+def _safe_filename(filename: str | None) -> str:
+    safe_name = Path(filename or "").name
+    if not safe_name or safe_name != filename or safe_name in {".", ".."}:
+        raise HTTPException(400, "Invalid filename")
+    return safe_name
+
+
+def _unique_filename(folder: Path, requested: str) -> str:
+    stem = Path(requested).stem or "attachment"
+    suffix = Path(requested).suffix
+    candidate = f"{stem}{suffix}"
+    counter = 2
+    while (folder / candidate).exists():
+        candidate = f"{stem}_{counter}{suffix}"
+        counter += 1
+    return candidate
+
+
+def _mail_attachment_meta(review_id: str, doc: dict[str, Any]) -> dict[str, Any]:
+    filename = str(doc.get("filename") or "")
+
+    return {
+        "name": filename,
+        "contentType": doc.get("content_type"),
+        "size": doc.get("size_bytes"),
+        "url": f"/api/reviews/{quote(review_id)}/mail-attachments/{quote(filename)}",
+    }
 
 
 class PdfHighlightRequest(BaseModel):
@@ -77,6 +120,68 @@ def _pdf_highlight_response(result: HighlightResult) -> PdfHighlightResponse:
 def get_review_attachment(review_id: str, filename: str) -> FileResponse:
     _common.require_review(review_id)
     return _common.file_response_inline(_resolve_review_attachment(review_id, filename))
+
+
+@router.get("/reviews/{review_id}/mail-attachments")
+def list_mail_attachments(review_id: str) -> list[dict[str, Any]]:
+    _common.require_review(review_id)
+    repo = _common.get_review_repo()
+    return [
+        _mail_attachment_meta(review_id, doc)
+        for doc in repo.list_documents(review_id, kind=_MAIL_ATTACHMENT_KIND)
+    ]
+
+
+@router.post("/reviews/{review_id}/mail-attachments")
+async def upload_mail_attachment(
+    review_id: str,
+    file: Annotated[UploadFile, File(...)],
+) -> dict[str, Any]:
+    _common.require_review(review_id)
+    requested_name = _safe_filename(file.filename)
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Uploaded file is empty")
+    if len(data) > _MAX_MAIL_ATTACHMENT_BYTES:
+        raise HTTPException(413, "Mail attachment is too large")
+
+    repo = _common.get_review_repo()
+    folder = repo.artifact_dir(review_id) / "mail_attachments"
+    folder.mkdir(parents=True, exist_ok=True)
+    filename = _unique_filename(folder, requested_name)
+    target = folder / filename
+    target.write_bytes(data)
+    repo.register_document(
+        review_id,
+        kind=_MAIL_ATTACHMENT_KIND,
+        path=target,
+        filename=filename,
+        content_type=file.content_type or None,
+    )
+    doc = repo.current_document(review_id, kind=_MAIL_ATTACHMENT_KIND, filename=filename)
+    return _mail_attachment_meta(review_id, doc or {})
+
+
+@router.delete("/reviews/{review_id}/mail-attachments/{filename}", status_code=204)
+def delete_mail_attachment(review_id: str, filename: str) -> None:
+    _common.require_review(review_id)
+    safe_name = _safe_filename(filename)
+    repo = _common.get_review_repo()
+    paths = repo.delete_current_document(
+        review_id,
+        kind=_MAIL_ATTACHMENT_KIND,
+        filename=safe_name,
+    )
+    if not paths:
+        raise HTTPException(404, f"Mail attachment '{safe_name}' not found")
+    for path in paths:
+        path.unlink(missing_ok=True)
+
+
+@router.get("/reviews/{review_id}/mail-attachments/{filename}")
+def get_mail_attachment(review_id: str, filename: str) -> FileResponse:
+    _common.require_review(review_id)
+    return _common.file_response_inline(_resolve_mail_attachment(review_id, filename))
 
 
 @router.post(

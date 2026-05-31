@@ -32,6 +32,23 @@ def find_stammdaten_by_article(pipeline: QuotingPipeline, artikelnummer: str) ->
     return None
 
 
+def match_from_dict(item: dict) -> MatchResult:
+    """Rebuild a ``MatchResult`` from its persisted dict shape.
+
+    Single source of truth for match deserialization so the ``manual``
+    provenance flag is never dropped on the way back in.
+    """
+    return MatchResult(
+        pos_nr=int(item.get("pos_nr", 0)),
+        status=item.get("status", "no_match"),
+        score=float(item.get("score", 0) or 0),
+        matched_artikelnr=item.get("matched_artikelnr"),
+        matched_bezeichnung=item.get("matched_bezeichnung"),
+        matched_row=item.get("matched_row"),
+        manual=bool(item.get("manual", False)),
+    )
+
+
 @dataclass
 class ReviewDataService:
     repo: SQLiteReviewRepository
@@ -104,16 +121,7 @@ class ReviewDataService:
 
         if isinstance(data, list) and data:
             saved_matches = [
-                MatchResult(
-                    pos_nr=int(item.get("pos_nr", 0)),
-                    status=item.get("status", "no_match"),
-                    score=float(item.get("score", 0) or 0),
-                    matched_artikelnr=item.get("matched_artikelnr"),
-                    matched_bezeichnung=item.get("matched_bezeichnung"),
-                    matched_row=item.get("matched_row"),
-                )
-                for item in data
-                if isinstance(item, dict)
+                match_from_dict(item) for item in data if isinstance(item, dict)
             ]
             active_pos_nrs = {pos.pos_nr for pos in anfrage.positionen}
             saved_by_pos = {

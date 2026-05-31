@@ -21,7 +21,12 @@ export const pipelineStepSchema = z
   })
   .passthrough();
 
-export const pipelineStatusSchema = z.enum(["running", "completed", "failed"]);
+export const pipelineStatusSchema = z.enum([
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+]);
 
 export const pipelineProgressSchema = z
   .object({

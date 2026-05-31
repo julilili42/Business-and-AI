@@ -5,9 +5,14 @@ import { cn } from "@/shared/lib/cn";
 
 import type { ReviewStatus } from "../schemas/reviewSummary";
 
-export type StatusFilter = "all" | ReviewStatus;
+export type StatusFilter = "all" | "manual_clarification" | ReviewStatus;
 export type DatePreset = "all" | "today" | "week" | "month";
-export type SortOption = "date_desc" | "date_asc" | "amount_desc" | "amount_asc";
+export type SortOption =
+  | "attention"
+  | "date_desc"
+  | "date_asc"
+  | "amount_desc"
+  | "amount_asc";
 
 interface ReviewFiltersProps {
   status: StatusFilter;
@@ -24,6 +29,7 @@ interface ReviewFiltersProps {
 
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: "all", label: "Alle" },
+  { value: "manual_clarification", label: "Klärung" },
   { value: "in_arbeit", label: "In Arbeit" },
   { value: "pdf_bereit", label: "Zu prüfen" },
   { value: "abgeschlossen", label: "Abgeschlossen" },
@@ -37,6 +43,7 @@ const DATE_OPTIONS: Array<{ value: DatePreset; label: string }> = [
 ];
 
 const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
+  { value: "attention", label: "Relevanz" },
   { value: "date_desc", label: "Neueste zuerst" },
   { value: "date_asc", label: "Älteste zuerst" },
   { value: "amount_desc", label: "Höchster Betrag" },
@@ -66,7 +73,7 @@ function FilterPills<T extends string>({
           className={cn(
             "rounded-full px-3 py-1 text-xs font-medium transition-all",
             active === opt.value
-              ? "bg-foreground text-white shadow-sm"
+              ? "border border-foreground/15 bg-muted text-foreground shadow-sm"
               : "border border-border bg-surface text-muted-foreground hover:border-foreground/30 hover:text-foreground",
           )}
         >

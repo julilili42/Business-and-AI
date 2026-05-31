@@ -53,6 +53,31 @@ def test_transition_approved_to_ready_to_send(review_id, approval_store):
     assert rec.sent_at is not None
 
 
+def test_transition_ready_to_send_to_reviewed_revokes_approval(review_id, approval_store):
+    approval_store.transition(review_id, "reviewed")
+    approval_store.transition(
+        review_id,
+        "approved",
+        actor="K",
+        final_pdf_path="final.pdf",
+        warning_acknowledged=True,
+        exception_reason="Freigabe trotz Warnung",
+    )
+    approval_store.transition(review_id, "ready_to_send")
+
+    rec = approval_store.transition(review_id, "reviewed", actor="K")
+
+    assert rec.state == "reviewed"
+    assert rec.approved_by is None
+    assert rec.approved_at is None
+    assert rec.sent_at is None
+    assert rec.final_pdf_path is None
+    assert rec.warning_acknowledged is False
+    assert rec.exception_reason is None
+    assert rec.history[-1]["from"] == "ready_to_send"
+    assert rec.history[-1]["to"] == "reviewed"
+
+
 def test_final_pdf_path_stored(review_id, approval_store):
     rec = approval_store.transition(review_id, "approved", final_pdf_path="final.pdf")
     assert rec.final_pdf_path == "final.pdf"

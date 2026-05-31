@@ -213,6 +213,15 @@ export interface paths {
         /**
          * Put Requirements Ack
          * @description Persist which extracted requirements have been acknowledged by the user.
+         *
+         *     Acknowledgments are stored by positional index. This is safe because the
+         *     only path that changes a review's ``anforderungen`` is re-extraction, which
+         *     runs exclusively via reset — and reset wipes every payload except the mail
+         *     (``reset_review_state(keep={MAIL})``), clearing these acknowledgments too.
+         *     So indices can never silently re-point at a different requirement. The
+         *     range check below additionally rejects stale/out-of-range indices, and the
+         *     quality gate fails safe (an unmatched index simply leaves a requirement
+         *     unacknowledged, blocking approval rather than waving it through).
          */
         put: operations["put_requirements_ack_api_reviews__review_id__requirements_ack_put"];
         post?: never;
@@ -231,7 +240,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Regenerate Quotation */
+        /**
+         * Regenerate Quotation
+         * @description Recompute prices (and optionally rebuild the draft PDF).
+         *
+         *     During editing the UI passes ``build_pdf=false`` so each keystroke-blur
+         *     only reprices (cheap); the draft PDF — only ever shown on the approval
+         *     step — is rebuilt once when the user gets there.
+         */
         post: operations["regenerate_quotation_api_reviews__review_id__regenerate_post"];
         delete?: never;
         options?: never;
@@ -276,6 +292,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reviews/{review_id}/escalate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Escalate Review
+         * @description Flag a review for hand-off to Engineering/Plant (the as-is branch for
+         *     inquiries Sales cannot answer automatically). Keeps the review and its
+         *     audit trail; reset clears the flag like any other pipeline output.
+         */
+        post: operations["escalate_review_api_reviews__review_id__escalate_post"];
+        /**
+         * Clear Escalation
+         * @description Withdraw an escalation (back to normal review).
+         */
+        delete: operations["clear_escalation_api_reviews__review_id__escalate_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/{review_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Pipeline
+         * @description Stop a running pipeline. Cooperative: drops queued steps and flags the
+         *     run cancelled so the coordinator won't enqueue the next step. A step that
+         *     is already executing finishes, but nothing further runs. No-op if the run
+         *     isn't currently in progress.
+         */
+        post: operations["cancel_pipeline_api_reviews__review_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reviews/{review_id}/events": {
         parameters: {
             query?: never;
@@ -305,6 +370,42 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/{review_id}/mail-attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Mail Attachments */
+        get: operations["list_mail_attachments_api_reviews__review_id__mail_attachments_get"];
+        put?: never;
+        /** Upload Mail Attachment */
+        post: operations["upload_mail_attachment_api_reviews__review_id__mail_attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/{review_id}/mail-attachments/{filename}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Mail Attachment */
+        get: operations["get_mail_attachment_api_reviews__review_id__mail_attachments__filename__get"];
+        put?: never;
+        post?: never;
+        /** Delete Mail Attachment */
+        delete: operations["delete_mail_attachment_api_reviews__review_id__mail_attachments__filename__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -709,6 +810,11 @@ export interface components {
             /** Changed Fields */
             changed_fields?: string[] | null;
         };
+        /** Body_upload_mail_attachment_api_reviews__review_id__mail_attachments_post */
+        Body_upload_mail_attachment_api_reviews__review_id__mail_attachments_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_review_api_reviews_upload_post */
         Body_upload_review_api_reviews_upload_post: {
             /** File */
@@ -761,6 +867,13 @@ export interface components {
             checked_at: string;
             pipeline_failures: components["schemas"]["PipelineFailureSummary"];
             stammdaten_quality: components["schemas"]["StammdatenQuality"] | null;
+        };
+        /** EscalateRequest */
+        EscalateRequest: {
+            /** Reason */
+            reason: string;
+            /** Actor */
+            actor?: string | null;
         };
         /**
          * Evidence
@@ -934,6 +1047,25 @@ export interface components {
             matched_row?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Manual
+             * @default false
+             */
+            manual: boolean;
+        };
+        /**
+         * OutgoingMailAttachment
+         * @description Additional file the user wants on the outgoing quotation email.
+         */
+        OutgoingMailAttachment: {
+            /** Name */
+            name: string;
+            /** Contenttype */
+            contentType?: string | null;
+            /** Size */
+            size?: number | null;
+            /** Url */
+            url: string;
         };
         /** PdfHighlightArea */
         PdfHighlightArea: {
@@ -1032,6 +1164,12 @@ export interface components {
             abmessungen?: string | null;
             /** Gewicht Stueck Kg */
             gewicht_stueck_kg?: number | null;
+            /** Gewicht Netto Kg */
+            gewicht_netto_kg?: number | null;
+            /** Gewicht Brutto Kg */
+            gewicht_brutto_kg?: number | null;
+            /** Verpackungsart */
+            verpackungsart?: string | null;
             /**
              * Ist Zertifikat
              * @default false
@@ -1167,8 +1305,14 @@ export interface components {
             has_draft_pdf: boolean;
             /** Has Final Pdf */
             has_final_pdf: boolean;
+            /** Mail Attachments */
+            mail_attachments?: components["schemas"]["OutgoingMailAttachment"][];
             /** Requirements Acknowledged */
             requirements_acknowledged?: number[];
+            /** Escalation */
+            escalation?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * ReviewListItem
@@ -1214,6 +1358,10 @@ export interface components {
             has_pdf: boolean;
             /** Manual Overrides Count */
             manual_overrides_count: number;
+            /** Escalation */
+            escalation?: {
+                [key: string]: unknown;
+            } | null;
             /** Extracted Articles */
             extracted_articles?: string[];
         };
@@ -1770,7 +1918,9 @@ export interface operations {
     };
     regenerate_quotation_api_reviews__review_id__regenerate_post: {
         parameters: {
-            query?: never;
+            query?: {
+                build_pdf?: boolean;
+            };
             header?: never;
             path: {
                 review_id: string;
@@ -1865,6 +2015,105 @@ export interface operations {
             };
         };
     };
+    escalate_review_api_reviews__review_id__escalate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EscalateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_escalation_api_reviews__review_id__escalate_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_pipeline_api_reviews__review_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     stream_review_events_api_reviews__review_id__events_get: {
         parameters: {
             query?: never;
@@ -1916,6 +2165,138 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_mail_attachments_api_reviews__review_id__mail_attachments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_mail_attachment_api_reviews__review_id__mail_attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_mail_attachment_api_reviews__review_id__mail_attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_mail_attachment_api_reviews__review_id__mail_attachments__filename__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: string;
+                filename: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_mail_attachment_api_reviews__review_id__mail_attachments__filename__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: string;
+                filename: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

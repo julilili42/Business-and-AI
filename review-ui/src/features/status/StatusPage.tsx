@@ -18,6 +18,10 @@ function fmtPct(n: number): string {
   return (n * 100).toFixed(1) + " %";
 }
 
+function fmtDecimal(n: number): string {
+  return n.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
 function fmtDuration(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds <= 0) return "—";
   if (seconds < 60) return `${seconds.toFixed(1)} s`;
@@ -55,17 +59,17 @@ function PipelineStats({ m }: { m: Metrics }) {
       <StatCell
         label="Angebote"
         value={m.total_reviews}
-        hint={`${m.completed_reviews} abgeschlossen (${completedPct} %)`}
+        hint={`${m.completed_reviews} fertig · ${completedPct}%`}
       />
       <StatCell
         label="Positionen"
         value={fmt(m.total_positions)}
-        hint={`Ø ${avgPositions.toFixed(1)} pro Angebot`}
+        hint={`Ø ${fmtDecimal(avgPositions)}/Angebot`}
       />
       <StatCell
         label="Match-Quote"
         value={fmtPct(m.avg_match_rate)}
-        hint="Stammdaten-Treffer"
+        hint="Stammdaten"
       />
       <StatCell
         label="Gesamtvolumen"
@@ -74,22 +78,22 @@ function PipelineStats({ m }: { m: Metrics }) {
       <StatCell
         label="Ø Pipeline-Zeit"
         value={`${m.avg_duration_s} s`}
-        hint="aktive Verarbeitung"
+        hint="Verarbeitung"
       />
       <StatCell
         label="Ø bis Freigabe"
         value={hasApprovalDuration ? fmtDuration(m.avg_approval_duration_s) : "—"}
-        hint={hasApprovalDuration ? `${m.reviews_with_approval_duration} freigegeben` : "noch keine Freigabe"}
+        hint={hasApprovalDuration ? `${m.reviews_with_approval_duration} Freigaben` : "keine Freigabe"}
       />
       <StatCell
         label="Fast-Path"
         value={totalExtractions > 0 ? fmtPct(fastPathRate) : "—"}
-        hint={totalExtractions > 0 ? `${m.fast_path_hits} ohne LLM, ${m.llm_calls} mit LLM` : "noch keine Daten"}
+        hint={totalExtractions > 0 ? `${m.fast_path_hits} ohne · ${m.llm_calls} mit LLM` : "keine Daten"}
       />
       <StatCell
         label="Zeitersparnis"
         value={`${hoursSaved.toFixed(1)} h`}
-        hint={`~${MINUTES_PER_MANUAL_REVIEW} min / Anfrage`}
+        hint={`~${MINUTES_PER_MANUAL_REVIEW} min/Anfrage`}
       />
     </div>
   );

@@ -21,6 +21,7 @@ import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import {
+  cancelReview,
   detachOutlookItem,
   getMailSettings,
   getOutlookItemStatus,
@@ -71,6 +72,8 @@ const STATES_TO_POLL_STATUS: MailWorkflowState[] = [
 
 const STATUS_POLL_INTERVAL_MS = 4000;
 
+type BatchRunOutcome = "completed" | "failed" | "cancelled";
+
 
 function reviewUiUrl(reviewId: string): string {
   return `${REVIEW_UI_URL}/reviews/${reviewId}`;
@@ -81,6 +84,9 @@ function formatProgressStatus(progress: PipelineProgress): string {
     return progress.error
       ? `Fehler: ${progress.error}`
       : "Pipeline fehlgeschlagen.";
+  }
+  if (progress.status === "cancelled") {
+    return "Pipeline gestoppt.";
   }
   if (progress.status === "completed") {
     return "Review bereit.";
@@ -135,6 +141,8 @@ function App() {
 
   const pollingReviewIdRef = useRef<string | null>(null);
   const statusPollTimerRef = useRef<number | null>(null);
+  const batchCancelRequestedRef = useRef(false);
+  const batchRunIdRef = useRef(0);
 
   /**
    * Fetch the bound review's status from the server and build a
@@ -235,10 +243,43 @@ function App() {
     );
   }
 
+  function patchBatchItemForRun(
+    runId: number,
+    itemId: string,
+    patch: Partial<BatchDraftItem>,
+  ) {
+    if (batchRunIdRef.current !== runId) return;
+    patchBatchItem(itemId, patch);
+  }
+
+  async function cancelBatchReviewIds(items: BatchDraftItem[]) {
+    const reviewIds = Array.from(
+      new Set(
+        items
+          .filter((item) =>
+            (item.status === "loading" || item.status === "running") &&
+            Boolean(item.reviewId),
+          )
+          .map((item) => item.reviewId as string),
+      ),
+    );
+    await Promise.all(reviewIds.map((reviewId) => cancelReview(reviewId).catch(() => {})));
+  }
+
   async function runBatchItem(
     item: SelectedMailSummary,
-  ): Promise<"completed" | "failed"> {
-    patchBatchItem(item.itemId, {
+    runId: number,
+  ): Promise<BatchRunOutcome> {
+    if (batchCancelRequestedRef.current || batchRunIdRef.current !== runId) {
+      patchBatchItemForRun(runId, item.itemId, {
+        status: "cancelled",
+        detail: "Pipeline gestoppt",
+        error: undefined,
+      });
+      return "cancelled";
+    }
+
+    patchBatchItemForRun(runId, item.itemId, {
       status: "loading",
       detail: "Mail wird geladen…",
       error: undefined,
@@ -250,41 +291,80 @@ function App() {
       mail = await readSelectedMailSnapshot(item.itemId);
       itemMailId = deriveMailId({ itemId: item.itemId }, mail);
     } catch (error) {
-      patchBatchItem(item.itemId, {
+      patchBatchItemForRun(runId, item.itemId, {
         status: "failed",
         error: String(error),
       });
       return "failed";
     }
 
-    patchBatchItem(item.itemId, {
+    if (batchCancelRequestedRef.current || batchRunIdRef.current !== runId) {
+      patchBatchItemForRun(runId, item.itemId, {
+        status: "cancelled",
+        detail: "Pipeline gestoppt",
+        error: undefined,
+      });
+      return "cancelled";
+    }
+
+    patchBatchItemForRun(runId, item.itemId, {
       status: "running",
       detail: "Startet…",
     });
 
     try {
       const started = await startReview(mail, itemMailId);
-      patchBatchItem(item.itemId, {
+      patchBatchItemForRun(runId, item.itemId, {
         status: "running",
         reviewId: started.review_id,
         detail: "Läuft…",
       });
 
+      if (batchCancelRequestedRef.current || batchRunIdRef.current !== runId) {
+        await cancelReview(started.review_id).catch(() => {});
+        patchBatchItemForRun(runId, item.itemId, {
+          status: "cancelled",
+          reviewId: started.review_id,
+          detail: "Pipeline gestoppt",
+          error: undefined,
+        });
+        return "cancelled";
+      }
+
       const completed = await pollReviewUntilComplete(started, (progress) => {
-        patchBatchItem(item.itemId, {
+        if (batchCancelRequestedRef.current || batchRunIdRef.current !== runId) return;
+        patchBatchItemForRun(runId, item.itemId, {
           status: "running",
           detail: formatProgressStatus(progress),
         });
       });
 
-      patchBatchItem(item.itemId, {
+      if (completed.status === "cancelled" || completed.progress?.status === "cancelled") {
+        patchBatchItemForRun(runId, item.itemId, {
+          status: "cancelled",
+          reviewId: completed.review_id,
+          detail: "Pipeline gestoppt",
+          error: undefined,
+        });
+        return "cancelled";
+      }
+
+      patchBatchItemForRun(runId, item.itemId, {
         status: "completed",
         reviewId: completed.review_id,
         detail: undefined,
       });
       return "completed";
     } catch (error) {
-      patchBatchItem(item.itemId, {
+      if (batchCancelRequestedRef.current || batchRunIdRef.current !== runId) {
+        patchBatchItemForRun(runId, item.itemId, {
+          status: "cancelled",
+          detail: "Pipeline gestoppt",
+          error: undefined,
+        });
+        return "cancelled";
+      }
+      patchBatchItemForRun(runId, item.itemId, {
         status: "failed",
         error: String(error),
       });
@@ -292,25 +372,35 @@ function App() {
     }
   }
 
-  async function handleCreateBatchReviews() {
+  async function handleCreateBatchReviews(mode: "auto" | "restart" = "auto") {
     if (selectedItems.length === 0) return;
 
     const isRetry =
-      batchItems.length > 0 && batchItems.some((i) => i.status === "failed");
+      mode !== "restart" &&
+      batchItems.length > 0 &&
+      batchItems.some((i) => i.status === "failed" || i.status === "cancelled");
 
     const itemsToProcess: SelectedMailSummary[] = isRetry
-      ? batchItems.filter((i) => i.status === "failed")
+      ? batchItems.filter((i) => i.status === "failed" || i.status === "cancelled")
       : selectedItems;
 
     if (itemsToProcess.length === 0) return;
 
+    if (mode === "restart") {
+      batchCancelRequestedRef.current = true;
+      await cancelBatchReviewIds(batchItems);
+    }
+
+    const runId = batchRunIdRef.current + 1;
+    batchRunIdRef.current = runId;
+    batchCancelRequestedRef.current = false;
     setLoading(true);
     setPipelineProgress(null);
 
     if (isRetry) {
       setBatchItems((items) =>
         items.map((i) =>
-          i.status === "failed"
+          i.status === "failed" || i.status === "cancelled"
             ? { ...i, status: "pending", error: undefined, detail: undefined }
             : i,
         ),
@@ -324,31 +414,39 @@ function App() {
       setBatchItems(
         selectedItems.map((item) => ({ ...item, status: "pending" })),
       );
-      setStatus("Reviews werden vorbereitet.");
+      setStatus(mode === "restart" ? "Batch wird neu gestartet…" : "Reviews werden vorbereitet.");
     }
 
     let completedCount = isRetry
       ? batchItems.filter((i) => i.status === "completed").length
       : 0;
     let failedCount = 0;
+    let cancelledCount = 0;
 
     const CONCURRENCY = 3;
     let cursor = 0;
     const workerCount = Math.min(CONCURRENCY, itemsToProcess.length);
     const workers = Array.from({ length: workerCount }, async () => {
       while (true) {
+        if (batchCancelRequestedRef.current || batchRunIdRef.current !== runId) return;
         const index = cursor++;
         if (index >= itemsToProcess.length) return;
-        const outcome = await runBatchItem(itemsToProcess[index]);
+        const outcome = await runBatchItem(itemsToProcess[index], runId);
+        if (batchRunIdRef.current !== runId) return;
         if (outcome === "completed") completedCount += 1;
+        else if (outcome === "cancelled") cancelledCount += 1;
         else failedCount += 1;
       }
     });
     await Promise.all(workers);
 
+    if (batchRunIdRef.current !== runId) return;
+
     const total = selectedItems.length;
     setStatus(
-      failedCount > 0
+      cancelledCount > 0
+        ? `${completedCount} von ${total} erstellt, ${cancelledCount} gestoppt.`
+        : failedCount > 0
         ? `${completedCount} von ${total} erstellt, ${failedCount} fehlgeschlagen.`
         : `${completedCount} Reviews bereit.`,
     );
@@ -357,12 +455,16 @@ function App() {
 
   async function handleRetryBatchItem(itemId: string) {
     const target = batchItems.find((i) => i.itemId === itemId);
-    if (!target || target.status !== "failed") return;
+    if (!target || (target.status !== "failed" && target.status !== "cancelled")) return;
 
     setLoading(true);
     setStatus("Mail wird wiederholt…");
+    const runId = batchRunIdRef.current + 1;
+    batchRunIdRef.current = runId;
+    batchCancelRequestedRef.current = false;
     try {
-      const outcome = await runBatchItem(target);
+      const outcome = await runBatchItem(target, runId);
+      if (batchRunIdRef.current !== runId) return;
       const total = selectedItems.length;
       const completedNow =
         batchItems.filter(
@@ -372,14 +474,44 @@ function App() {
         batchItems.filter(
           (i) => i.itemId !== itemId && i.status === "failed",
         ).length + (outcome === "failed" ? 1 : 0);
+      const cancelledNow =
+        batchItems.filter(
+          (i) => i.itemId !== itemId && i.status === "cancelled",
+        ).length + (outcome === "cancelled" ? 1 : 0);
       setStatus(
-        failedNow > 0
+        cancelledNow > 0
+          ? `${completedNow} von ${total} erstellt, ${cancelledNow} gestoppt.`
+          : failedNow > 0
           ? `${completedNow} von ${total} erstellt, ${failedNow} fehlgeschlagen.`
           : `${completedNow} Reviews bereit.`,
       );
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleStopBatchPipelines() {
+    if (batchItems.length === 0) return;
+    batchCancelRequestedRef.current = true;
+    batchRunIdRef.current += 1;
+    setStatus("Batch-Pipeline wird gestoppt…");
+    setBatchItems((items) =>
+      items.map((item) =>
+        item.status === "pending" ||
+        item.status === "loading" ||
+        item.status === "running"
+          ? {
+              ...item,
+              status: "cancelled",
+              detail: "Pipeline gestoppt",
+              error: undefined,
+            }
+          : item,
+      ),
+    );
+    await cancelBatchReviewIds(batchItems);
+    setLoading(false);
+    setStatus("Batch-Pipeline gestoppt.");
   }
 
   async function awaitReviewCompletion(
@@ -402,9 +534,13 @@ function App() {
       );
       const updated = await refreshServerWorkflow(targetMailId);
       setPipelineProgress(completed.progress ?? null);
-      setStatus("Review bereit.");
-      if (openWhenReady && updated) {
-        handleOpenReview(updated);
+      if (completed.status === "cancelled" || completed.progress?.status === "cancelled") {
+        setStatus("Pipeline gestoppt.");
+      } else {
+        setStatus("Review bereit.");
+        if (openWhenReady && updated) {
+          handleOpenReview(updated);
+        }
       }
     } finally {
       pollingReviewIdRef.current = null;
@@ -508,12 +644,39 @@ function App() {
     if (!mailId) return;
     setLoading(true);
     try {
+      // Stop an in-flight run first so detaching doesn't leave an orphaned
+      // pipeline churning in the background.
+      if (workflow?.reviewId && workflow.state === "review_running") {
+        await cancelReview(workflow.reviewId).catch(() => {});
+      }
       await detachOutlookItem(mailId);
       setWorkflow(null);
       setPipelineProgress(null);
       setStatus("Neu gestartet.");
     } catch (error) {
       setStatus(`Neu starten fehlgeschlagen: ${String(error)}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleStopPipeline() {
+    if (!mailId || !workflow?.reviewId) return;
+    setLoading(true);
+    setStatus("Pipeline wird gestoppt…");
+    try {
+      await cancelReview(workflow.reviewId);
+      // Reflect immediately; the active poller picks up the cancelled
+      // status on its next tick and also settles the workflow state.
+      setPipelineProgress((prev) =>
+        prev
+          ? { ...prev, status: "cancelled", error: "Pipeline manuell gestoppt" }
+          : prev,
+      );
+      await refreshServerWorkflow(mailId);
+      setStatus("Pipeline gestoppt.");
+    } catch (error) {
+      setStatus(`Stoppen fehlgeschlagen: ${String(error)}`);
     } finally {
       setLoading(false);
     }
@@ -720,6 +883,8 @@ function App() {
           onReloadSelection={loadMail}
           onOpenOverview={() => openUrl(REVIEW_OVERVIEW_URL)}
           onRetryItem={handleRetryBatchItem}
+          onRestartBatch={() => void handleCreateBatchReviews("restart")}
+          onStopBatch={handleStopBatchPipelines}
         />
         {shouldShowStatusCard(status, false, false, false) && (
           <StatusCard status={status} loading={loading} />
@@ -742,6 +907,7 @@ function App() {
         onOpenReview={() => handleOpenReview()}
         onCreateDraftMail={handleCreateDraftMail}
         onResetWorkflow={handleResetWorkflow}
+        onStopPipeline={handleStopPipeline}
         onReloadMail={loadMail}
         onOpenOverview={() => openUrl(REVIEW_OVERVIEW_URL)}
       />

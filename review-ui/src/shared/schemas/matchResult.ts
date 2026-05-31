@@ -15,5 +15,6 @@ export const matchResultSchema = z
     matched_artikelnr: z.string().nullable().optional(),
     matched_bezeichnung: z.string().nullable().optional(),
     matched_row: z.record(z.unknown()).nullable().optional(),
+    manual: z.boolean().default(false),
   })
   .passthrough();

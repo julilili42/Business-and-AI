@@ -60,7 +60,16 @@ export function MatchChip({
             {STATUS_LABEL[match.status]}
           </span>
 
-          {score && (
+          {match.manual && (
+            <span
+              className="inline-flex items-center gap-1 rounded bg-ek-blue-soft px-1.5 py-0.5 font-semibold text-ek-blue"
+              title="Diese Zuordnung wurde manuell gesetzt und bleibt bei Änderungen erhalten."
+            >
+              manuell
+            </span>
+          )}
+
+          {score && !match.manual && (
             <span className="rounded bg-muted px-1.5 py-0.5 font-medium text-muted-foreground">
               Score {score}
             </span>

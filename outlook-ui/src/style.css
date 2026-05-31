@@ -1,7 +1,7 @@
 /* =====================================================================
  * ElringKlinger Quoting · Outlook taskpane
  *
- * Design language mirrors the Streamlit UI: ElringKlinger-red accent,
+ * Design language follows the Outlook taskpane: Fluent-blue workflow accents,
  * Inter Tight for headings, Inter for body. Layout is a single vertical
  * column ~380px wide, optimised for the narrow Outlook side panel.
  * Everything fits in one card per active state — no nested sections,
@@ -28,6 +28,10 @@
     --ek-brand-dark:    #b8000b;
     --ek-brand-soft:    #fef2f2;
     --ek-brand-border:  #fecaca;
+    --outlook-accent:       #0078d4;
+    --outlook-accent-dark:  #106ebe;
+    --outlook-accent-soft:  #eff6fc;
+    --outlook-accent-border:#c7e0f4;
     --ek-success:       #047857;
     --ek-success-soft:  #ecfdf5;
     --ek-success-border:#a7f3d0;
@@ -100,7 +104,7 @@ html, body {
     transition: background 0.2s ease;
 }
 .step.done  .step-connector,
-.step.active .step-connector { background: var(--ek-success); }
+.step.active .step-connector { background: var(--outlook-accent); }
 
 /* Circle badge */
 .step-circle {
@@ -117,12 +121,13 @@ html, body {
     transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 .step.active .step-circle {
-    border-color: var(--ek-brand);
-    color: var(--ek-brand);
+    border-color: var(--outlook-accent);
+    background: var(--outlook-accent-soft);
+    color: var(--outlook-accent);
 }
 .step.done .step-circle {
-    border-color: var(--ek-success);
-    background: var(--ek-success);
+    border-color: var(--outlook-accent);
+    background: var(--outlook-accent);
     color: #fff;
 }
 
@@ -133,7 +138,7 @@ html, body {
     color: var(--ek-faint);
     line-height: 1;
 }
-.step.active .step-index { color: var(--ek-brand); }
+.step.active .step-index { color: var(--outlook-accent); }
 
 .step-title {
     font-size: 10.5px;
@@ -148,7 +153,7 @@ html, body {
     font-weight: 600;
 }
 .step.done .step-title {
-    color: var(--ek-text-2);
+    color: var(--outlook-accent-dark);
 }
 
 /* ---------------- Card (the workhorse element) ------------------------- */
@@ -167,6 +172,10 @@ html, body {
 .card-success {
     border-color: var(--ek-success-border);
     background: linear-gradient(180deg, var(--ek-success-soft) 0%, white 35%);
+}
+.card-warning {
+    border-color: var(--ek-warning-border);
+    background: linear-gradient(180deg, var(--ek-warning-soft) 0%, white 35%);
 }
 .card-error {
     border-color: var(--ek-danger-border);
@@ -410,9 +419,9 @@ html, body {
 
 .action-help-button:hover,
 .action-help-button:focus-visible {
-    background: var(--outlook-blue-soft);
-    border-color: var(--outlook-blue);
-    color: var(--outlook-blue-hover);
+    background: var(--ek-brand-soft);
+    border-color: var(--ek-brand-border);
+    color: var(--ek-brand);
     outline: none;
 }
 
@@ -598,6 +607,10 @@ html, body {
     border-color: var(--ek-danger-border);
     background: var(--ek-danger-soft);
 }
+.batch-row-cancelled {
+    border-color: var(--ek-warning-border);
+    background: var(--ek-warning-soft);
+}
 .batch-row-icon-wrap {
     display: inline-flex;
     align-items: center;
@@ -628,6 +641,10 @@ html, body {
 .batch-row-failed .batch-row-icon-wrap {
     background: var(--ek-surface);
     color: var(--ek-danger);
+}
+.batch-row-cancelled .batch-row-icon-wrap {
+    background: var(--ek-surface);
+    color: var(--ek-warning);
 }
 .batch-row-main {
     min-width: 0;
@@ -851,31 +868,5 @@ html, body {
     flex-shrink: 0;
 }
 
-/* ---------------- Outlook blue overrides ------------------ */
-:root {
-    --outlook-blue: #0f6cbd;
-    --outlook-blue-hover: #115ea3;
-    --outlook-blue-soft: #ebf3fa;
-    --outlook-blue-border: #cfe2f3;
-}
-
-.step.active .step-circle {
-    border-color: var(--outlook-blue);
-}
-.step.active .step-index { color: var(--outlook-blue); }
-.step.done .step-circle {
-    border-color: var(--outlook-blue);
-    background: var(--outlook-blue);
-}
-.step.done .step-connector,
-.step.active .step-connector { background: var(--outlook-blue); }
-.step.active .step-title { color: var(--outlook-blue-hover); }
-.step.done .step-title   { color: var(--outlook-blue-hover); }
-
-.pipeline-progress-fill {
-    background: linear-gradient(
-        90deg,
-        var(--outlook-blue) 0%,
-        var(--outlook-blue-hover) 100%
-    );
-}
+/* The top-level stepper uses Outlook/Fluent blue so it blends into the
+ * surrounding Outlook taskpane. */

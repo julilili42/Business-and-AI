@@ -47,6 +47,17 @@ class MailMeta(BaseModel):
     attachments: list[MailAttachmentMeta] = Field(default_factory=list)
 
 
+class OutgoingMailAttachment(BaseModel):
+    """Additional file the user wants on the outgoing quotation email."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str
+    contentType: str | None = None
+    size: int | None = None
+    url: str
+
+
 class MatchResultModel(BaseModel):
     """Mirror of ``quoting.matching.matcher.MatchResult.to_dict``."""
 
@@ -56,6 +67,7 @@ class MatchResultModel(BaseModel):
     matched_artikelnr: str | None = None
     matched_bezeichnung: str | None = None
     matched_row: dict[str, Any] | None = None
+    manual: bool = False
 
 
 class QuotationItemModel(BaseModel):
@@ -119,6 +131,7 @@ class ReviewListItem(BaseModel):
     status: ReviewStatus
     has_pdf: bool
     manual_overrides_count: int
+    escalation: dict[str, Any] | None = None
     extracted_articles: list[str] = Field(default_factory=list)
 
 
@@ -135,7 +148,9 @@ class ReviewDetail(BaseModel):
     mail: MailMeta
     has_draft_pdf: bool
     has_final_pdf: bool
+    mail_attachments: list[OutgoingMailAttachment] = Field(default_factory=list)
     requirements_acknowledged: list[int] = Field(default_factory=list)
+    escalation: dict[str, Any] | None = None
 
 
 class FinalizeResponse(BaseModel):

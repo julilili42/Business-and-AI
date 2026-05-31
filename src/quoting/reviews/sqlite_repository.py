@@ -40,6 +40,7 @@ class Payloads:
     EXTRACTION_META = "extraction_meta"
     LLM_USAGE = "llm_usage"
     REQUIREMENTS_ACKNOWLEDGED = "requirements_acknowledged"
+    ESCALATION = "escalation"
 
 
 # Legacy keys produced before payload names dropped their ``.json`` suffix
@@ -471,6 +472,13 @@ class SQLiteReviewRepository:
     def save_mail(self, review_id: str, mail: dict[str, Any]) -> None:
         self.save_payload(review_id, Payloads.MAIL, mail)
 
+    def load_escalation(self, review_id: str) -> dict[str, Any] | None:
+        data = self.load_payload(review_id, Payloads.ESCALATION)
+        return data if isinstance(data, dict) else None
+
+    def save_escalation(self, review_id: str, record: dict[str, Any]) -> None:
+        self.save_payload(review_id, Payloads.ESCALATION, record)
+
     def load_approval(self, review_id: str) -> dict[str, Any] | None:
         data = self.load_payload(review_id, Payloads.APPROVAL)
         return data if isinstance(data, dict) else None
@@ -725,6 +733,31 @@ class SQLiteReviewRepository:
                 params,
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def delete_current_document(self, review_id: str, *, kind: str, filename: str) -> list[Path]:
+        safe_name = Path(filename).name
+        now = _now_iso()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT storage_path FROM documents
+                WHERE review_id=? AND kind=? AND filename=? AND is_current=1
+                """,
+                (review_id, kind, safe_name),
+            ).fetchall()
+            conn.execute(
+                """
+                UPDATE documents
+                SET is_current=0
+                WHERE review_id=? AND kind=? AND filename=? AND is_current=1
+                """,
+                (review_id, kind, safe_name),
+            )
+            conn.execute(
+                "UPDATE reviews SET updated_at=? WHERE review_id=?",
+                (now, review_id),
+            )
+        return [Path(str(row["storage_path"])) for row in rows]
 
     def delete_documents_except(self, review_id: str, *, keep_kinds: set[str]) -> None:
         placeholders = ",".join("?" for _ in keep_kinds)

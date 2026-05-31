@@ -53,6 +53,9 @@ class Position(BaseModel):
     zeichnungsnummer: str | None = None
     abmessungen: str | None = None
     gewicht_stueck_kg: float | None = None
+    gewicht_netto_kg: float | None = None
+    gewicht_brutto_kg: float | None = None
+    verpackungsart: str | None = None
     ist_zertifikat: bool = False
     confidence: Confidence
     source_quote: str

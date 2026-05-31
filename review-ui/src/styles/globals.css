@@ -14,6 +14,15 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
   h1,
   h2,
   h3,
@@ -34,5 +43,16 @@
    */
   .section-label {
     @apply text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 }

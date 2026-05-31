@@ -236,6 +236,45 @@ def test_failure_does_not_enqueue_next_step(queue, progress, review_id):
     assert jobs[0].status == "failed"
 
 
+# ---------------------------------------------------------------- cancellation
+
+
+def test_cancel_stops_pipeline_after_current_step(queue, progress, review_id):
+    progress.init(review_id)
+    coordinator, handlers = _make_coordinator(queue, progress)
+    coordinator.start_pipeline(review_id)
+
+    # Run only the first step; completing it enqueues `match`.
+    handlers_dict = coordinator.worker_handlers()
+    job = queue.claim_next()
+    assert job is not None and job.step == "extract"
+    handlers_dict[job.step](job)
+    queue.complete(job.id)
+    assert [j.step for j in queue.list_for_review(review_id)] == ["extract", "match"]
+
+    # User stops the run: flag cancelled + drop the queued step.
+    progress.cancel(review_id)
+    assert queue.cancel_pending(review_id) == 1
+
+    # Nothing else runs and the next step is never re-enqueued.
+    assert _drive(coordinator, queue) == 0
+    assert handlers.calls == [f"extract:{review_id}"]
+    assert progress.read(review_id)["status"] == "cancelled"
+
+
+def test_cancelled_run_skips_claimed_step(queue, progress, review_id):
+    """A step claimed after cancellation does no work and enqueues nothing."""
+    progress.init(review_id)
+    progress.cancel(review_id)
+    coordinator, handlers = _make_coordinator(queue, progress)
+    queue.enqueue(review_id, "extract")
+
+    _drive(coordinator, queue)
+
+    assert handlers.calls == []
+    assert [j.step for j in queue.list_for_review(review_id)] == ["extract"]
+
+
 # ---------------------------------------------------------------- meta
 
 

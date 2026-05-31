@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+from urllib.parse import quote
 
 from quoting.api.services.quotation_service import (
     filter_redundant_custom_price_overrides,
@@ -49,5 +50,25 @@ class GetReviewDetailUseCase:
             "mail": format_mail_dict(mail_meta),
             "has_draft_pdf": self.review_reads.find_draft_pdf(review_id) is not None,
             "has_final_pdf": self.review_reads.find_final_pdf(review_id) is not None,
+            "mail_attachments": _mail_attachments(self.repo, review_id),
             "requirements_acknowledged": self.repo.load_requirements_acknowledged(review_id),
+            "escalation": self.repo.load_escalation(review_id),
         }
+
+
+def _mail_attachments(repo: SQLiteReviewRepository, review_id: str) -> list[dict]:
+    attachments = []
+    for doc in repo.list_documents(review_id, kind="mail_attachment"):
+        filename = str(doc.get("filename") or "")
+        attachments.append(
+            {
+                "name": filename,
+                "contentType": doc.get("content_type"),
+                "size": doc.get("size_bytes"),
+                "url": (
+                    f"/api/reviews/{quote(review_id)}/mail-attachments/"
+                    f"{quote(filename)}"
+                ),
+            }
+        )
+    return attachments

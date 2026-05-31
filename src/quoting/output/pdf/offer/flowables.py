@@ -252,6 +252,22 @@ def items_table(
             ),
             "", "", "", "",
         ])
+        packaging = _position_optional_text(source_pos, "verpackungsart")
+        if packaging:
+            data.append([
+                "",
+                Paragraph("Verpackung:", styles["table_small"]),
+                Paragraph(html_escape(packaging), styles["table_small"]),
+                "", "", "", "",
+            ])
+        weight_text = _position_weight_text(source_pos)
+        if weight_text:
+            data.append([
+                "",
+                Paragraph("Gewicht:", styles["table_small"]),
+                Paragraph(html_escape(weight_text), styles["table_small"]),
+                "", "", "", "",
+            ])
 
         data.append(["", "", "", "", "", "", ""])
 
@@ -299,6 +315,40 @@ def _position_text(pos, field_name: str, fallback: str) -> str:
     if not fallback or _is_placeholder(fallback):
         return "—"
     return fallback
+
+
+def _position_optional_text(pos, field_name: str) -> str:
+    value = getattr(pos, field_name, None) if pos is not None else None
+    return str(value or "").strip()
+
+
+def _position_weight_text(pos) -> str:
+    if pos is None:
+        return ""
+    parts = []
+    net = _format_kg(getattr(pos, "gewicht_netto_kg", None))
+    gross = _format_kg(getattr(pos, "gewicht_brutto_kg", None))
+    piece = _format_kg(getattr(pos, "gewicht_stueck_kg", None))
+    if net:
+        parts.append(f"Netto {net}")
+    if gross:
+        parts.append(f"Brutto {gross}")
+    if piece:
+        parts.append(f"Stück {piece}")
+    return " / ".join(parts)
+
+
+def _format_kg(value: object) -> str:
+    if value is None:
+        return ""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return ""
+    if number <= 0:
+        return ""
+    formatted = f"{number:.3f}".rstrip("0").rstrip(".").replace(".", ",")
+    return f"{formatted} kg"
 
 
 def _is_placeholder(text: str) -> bool:

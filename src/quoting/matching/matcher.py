@@ -25,6 +25,10 @@ class MatchResult:
     matched_artikelnr: str | None = None
     matched_bezeichnung: str | None = None
     matched_row: dict | None = None
+    # True when a user pinned this match by hand ("Artikel zuordnen" or a
+    # custom article). Manual pins are never overwritten when matches are
+    # recomputed after an edit; automatic matches are.
+    manual: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -34,6 +38,7 @@ class MatchResult:
             "matched_artikelnr": self.matched_artikelnr,
             "matched_bezeichnung": self.matched_bezeichnung,
             "matched_row": self.matched_row,
+            "manual": self.manual,
         }
 
 

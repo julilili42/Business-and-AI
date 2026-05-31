@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from quoting.api.progress_store import ProgressStore
-from quoting.api.services.review_service import ReviewDataService
+from quoting.api.services.review_service import ReviewDataService, match_from_dict
 from quoting.core import Anfrage
 from quoting.matching import MatchResult
 from quoting.pipeline import QuotingPipeline, StepContext, StepProgress
@@ -115,18 +115,7 @@ class StepHandlers:
             raise StepInputMissing(
                 f"No matches for review {review_id!r} — match must run first"
             )
-        return [
-            MatchResult(
-                pos_nr=int(item.get("pos_nr", 0)),
-                status=item.get("status", "no_match"),
-                score=float(item.get("score", 0) or 0),
-                matched_artikelnr=item.get("matched_artikelnr"),
-                matched_bezeichnung=item.get("matched_bezeichnung"),
-                matched_row=item.get("matched_row"),
-            )
-            for item in raw
-            if isinstance(item, dict)
-        ]
+        return [match_from_dict(item) for item in raw if isinstance(item, dict)]
 
     # ----------------------------------------------------------------- steps
     def extract(self, review_id: str) -> None:

@@ -25,10 +25,6 @@ export function MailBodyViewer({
         className,
       )}
     >
-      <div className="border-b border-border bg-muted px-4 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-        E-Mail
-      </div>
-
       <header className="space-y-1 border-b border-border bg-gradient-to-b from-muted to-surface px-5 py-4 text-sm">
         <Row label="Betreff" value={mail.subject || "(kein Betreff)"} />
         <Row label="Von" value={mail.from || "—"} />

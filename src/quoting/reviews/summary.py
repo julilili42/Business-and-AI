@@ -41,6 +41,7 @@ class ReviewSummary:
     status: ReviewStatus
     pdf_path: Path | None
     manual_overrides_count: int
+    escalation: dict | None
 
     extracted_articles: list[str]
     """Article numbers extracted from the original RFQ — for top-N stats."""
@@ -81,6 +82,7 @@ def _summarize(
     extraction = repo.load_anfrage(review_id) or {}
     quotation = repo.load_quotation(review_id) or {}
     approval = repo.load_approval(review_id) or {}
+    escalation = repo.load_escalation(review_id)
     overrides = repo.load_overrides(review_id)
 
     positions = extraction.get("positionen") or []
@@ -129,6 +131,7 @@ def _summarize(
         status=status,
         pdf_path=pdf_path,
         manual_overrides_count=len(overrides),
+        escalation=escalation if escalation and escalation.get("escalated") else None,
         extracted_articles=extracted_articles,
     )
 

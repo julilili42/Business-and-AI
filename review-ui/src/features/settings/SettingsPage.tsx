@@ -43,11 +43,11 @@ export function SettingsPage() {
 
   return (
     <PageContainer>
-      <header className="mb-10">
+      <header className="mb-8">
         <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
-          Einstellungen<span className="text-brand">.</span>
+          Einstellungen<span className="text-ek-blue">.</span>
         </h1>
-        <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
           Stammdaten für PDF-Header, Editor-Verhalten und Matching-Schwellen.
         </p>
       </header>
@@ -226,9 +226,9 @@ function SettingsCard({
 }) {
   return (
     <Card>
-      <CardHeader className="pb-5">
+      <CardHeader className="p-5">
         <div className="flex items-center gap-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-soft text-brand">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-ek-blue-soft text-ek-blue">
             {icon}
           </span>
           <div>
@@ -239,7 +239,7 @@ function SettingsCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">{children}</CardContent>
+      <CardContent className="space-y-6 px-5 pb-5">{children}</CardContent>
     </Card>
   );
 }
@@ -313,7 +313,7 @@ function Toggle({
         className={cn(
           "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-          checked ? "bg-brand" : "bg-muted",
+          checked ? "bg-ek-blue" : "bg-muted",
         )}
       >
         <span
