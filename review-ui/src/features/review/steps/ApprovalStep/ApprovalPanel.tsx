@@ -78,6 +78,7 @@ export function ApprovalPanel({
   }, [hasWarnings]);
 
   const approved = isApproved(approval);
+  const compactEmbedded = embedded && layout === "stacked";
 
   if (approved) {
     const approvedContent = (
@@ -185,10 +186,12 @@ export function ApprovalPanel({
       className={cn(
         embedded && layout === "inline"
           ? "grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end"
-          : "space-y-3",
+          : compactEmbedded
+            ? "space-y-2.5"
+            : "space-y-3",
       )}
     >
-      <div className="space-y-1.5">
+      <div className={cn("space-y-1.5", compactEmbedded && "space-y-1")}>
         <Label className="text-xs font-semibold text-foreground">
           Freigegeben durch
         </Label>
@@ -197,10 +200,11 @@ export function ApprovalPanel({
           onChange={(e) => setActor(e.target.value)}
           placeholder="Vor- und Nachname"
           autoComplete="name"
+          className={cn(compactEmbedded && "h-9")}
         />
       </div>
 
-      <div className="space-y-1.5">
+      <div className={cn("space-y-1.5", compactEmbedded && "space-y-1")}>
         <Label className="text-xs font-semibold text-foreground">
           Dateiname finale PDF
         </Label>
@@ -208,11 +212,13 @@ export function ApprovalPanel({
           value={filename}
           onChange={(e) => setFilename(e.target.value)}
           placeholder="Angebot_Kunde.pdf"
+          className={cn(compactEmbedded && "h-9")}
         />
       </div>
 
       <Button
         variant="primary"
+        size={compactEmbedded ? "sm" : "md"}
         className={embedded && layout === "inline" ? "w-full lg:w-auto" : "w-full"}
         disabled={!canApprove || finalize.isPending}
         title={

@@ -4,8 +4,9 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useMemo, type KeyboardEvent } from "react";
 
+import { cn } from "@/shared/lib/cn";
 import { formatEur } from "@/shared/lib/format";
 import type { StammdatenRow } from "@/shared/schemas/stammdaten";
 
@@ -24,6 +25,15 @@ interface StammdatenTableProps {
  * `useReactTable` body for `@tanstack/react-virtual`.
  */
 export function StammdatenTable({ rows, onRowClick }: StammdatenTableProps) {
+  const openRowFromKeyboard = (
+    event: KeyboardEvent<HTMLTableRowElement>,
+    row: StammdatenRow,
+  ) => {
+    if (!onRowClick || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    onRowClick(row);
+  };
+
   const columns = useMemo<ColumnDef<StammdatenRow>[]>(
     () => [
       {
@@ -31,7 +41,7 @@ export function StammdatenTable({ rows, onRowClick }: StammdatenTableProps) {
         header: "Artikel-Nr.",
         accessorKey: "artikel_nr",
         cell: ({ getValue }) => (
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] group-hover:text-brand">
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] transition-colors group-hover:bg-brand-soft group-hover:text-brand">
             {String(getValue() ?? "")}
           </code>
         ),
@@ -41,7 +51,9 @@ export function StammdatenTable({ rows, onRowClick }: StammdatenTableProps) {
         header: "Bezeichnung",
         accessorKey: "bezeichnung",
         cell: ({ getValue }) => (
-          <span className="font-medium">{String(getValue() ?? "—")}</span>
+          <span className="font-medium transition-colors group-hover:text-foreground">
+            {String(getValue() ?? "—")}
+          </span>
         ),
       },
       {
@@ -111,14 +123,17 @@ export function StammdatenTable({ rows, onRowClick }: StammdatenTableProps) {
             {table.getRowModel().rows.map((row, i) => (
               <tr
                 key={row.id}
-                className={
-                  onRowClick
-                    ? "group cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-surface-sunk"
-                    : i % 2 === 0
-                      ? "bg-surface"
-                      : "bg-muted/30"
-                }
+                role={onRowClick ? "button" : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+                aria-label={onRowClick ? `Artikel ${row.original.artikel_nr} öffnen` : undefined}
+                className={cn(
+                  "group border-b border-border last:border-0",
+                  i % 2 === 0 ? "bg-surface" : "bg-muted/20",
+                  onRowClick &&
+                    "cursor-pointer transition-all duration-150 hover:bg-ek-blue-soft/35 hover:shadow-[inset_3px_0_0_hsl(var(--ek-blue))] focus-visible:bg-ek-blue-soft/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                )}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                onKeyDown={(event) => openRowFromKeyboard(event, row.original)}
               >
                 {row.getVisibleCells().map((cell) => (
                   <td

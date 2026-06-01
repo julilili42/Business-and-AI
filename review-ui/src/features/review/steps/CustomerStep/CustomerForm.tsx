@@ -98,11 +98,11 @@ export function CustomerForm({
       className="scroll-mt-6 space-y-6"
     >
       <div className="space-y-3">
-        <div className="flex min-h-10 flex-wrap items-center justify-between gap-2">
+        <div className="relative">
           <h2 id="customer-data-heading" className="section-label">
             Kunde &amp; Anfrage-Header
           </h2>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="mt-2 flex flex-wrap items-center justify-end gap-2 sm:absolute sm:right-0 sm:top-1/2 sm:mt-0 sm:-translate-y-1/2">
             {showChangeIndicator && <ChangedFieldsIndicator />}
             <SaveStatus
               pending={saveAndRegenerate.isPending}

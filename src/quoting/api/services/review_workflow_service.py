@@ -131,6 +131,7 @@ class ReviewWorkflowService:
             self.review_data = ReviewDataService(
                 self.repo,
                 approval_store=self.approvals,
+                settings_loader=self.settings_loader,
             )
         return self.review_data
 
@@ -313,6 +314,7 @@ class ReviewWorkflowService:
             repo=self.repo,
             pipeline=self.pipeline,
             review_data=self.review_data_service,
+            settings_loader=self.settings_loader,
         ).execute(review_id, payload)
 
     def save_overrides(self, review_id: str, payload: list[dict]) -> list[dict]:

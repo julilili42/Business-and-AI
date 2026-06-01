@@ -25,6 +25,12 @@ export default defineConfig(async ({ command }) => {
       port: 5173,
       strictPort: true,
       https,
+      proxy: {
+        "/api": {
+          target: "http://127.0.0.1:8000",
+          changeOrigin: true,
+        },
+      },
     },
   };
 });

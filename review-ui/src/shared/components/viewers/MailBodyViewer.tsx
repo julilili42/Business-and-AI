@@ -49,7 +49,7 @@ function renderWithHighlight(text: string, query: string) {
   return (
     <>
       {text.slice(0, idx)}
-      <mark className="rounded bg-amber-200 px-0.5 text-foreground not-italic">
+      <mark className="rounded bg-amber-200 px-0.5 text-amber-950 not-italic">
         {text.slice(idx, idx + query.length)}
       </mark>
       {text.slice(idx + query.length)}

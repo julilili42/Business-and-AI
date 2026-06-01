@@ -9,12 +9,14 @@ from quoting.api.services.review_service import (
     ReviewDataService,
     enrich_exact_article_edits,
     match_from_dict,
+    match_positions_with_settings,
 )
+from quoting.api.settings_store import load_user_settings
 from quoting.api.use_cases.errors import UseCaseBadRequest, UseCaseUnprocessable
 from quoting.core import Anfrage
-from quoting.matching import match_positions
 from quoting.pipeline import QuotingPipeline
 from quoting.reviews.sqlite_repository import SQLiteReviewRepository
+from quoting.api.use_cases.common import SettingsLoader
 
 log = logging.getLogger("quoting.frontend_router")
 
@@ -24,6 +26,7 @@ class UpdateAnfrageUseCase:
     repo: SQLiteReviewRepository
     pipeline: QuotingPipeline
     review_data: ReviewDataService
+    settings_loader: SettingsLoader = load_user_settings
 
     def execute(self, review_id: str, payload: dict) -> dict:
         try:
@@ -51,11 +54,10 @@ class UpdateAnfrageUseCase:
             if match.manual
         }
         try:
-            recomputed = match_positions(
-                anfrage.positionen,
-                self.pipeline.stammdaten,
-                fuzzy_threshold=self.pipeline.settings.fuzzy_threshold,
-                semantic_threshold=self.pipeline.settings.semantic_threshold,
+            recomputed = match_positions_with_settings(
+                anfrage,
+                self.pipeline,
+                self.settings_loader,
             )
         except Exception as exc:
             log.exception("put_anfrage: match recompute failed for %s", review_id)

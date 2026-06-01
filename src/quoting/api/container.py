@@ -68,12 +68,18 @@ class AppContainer:
         self,
         repo: SQLiteReviewRepository | None = None,
         approval_store: ApprovalStore | None = None,
+        settings_loader: SettingsLoader | None = None,
     ) -> ReviewDataService:
         from quoting.api.services.review_service import ReviewDataService
+        from quoting.api.settings_store import load_user_settings
 
         active_repo = repo or self.review_repo()
         approvals = approval_store or self.approval_store(active_repo)
-        return ReviewDataService(active_repo, approval_store=approvals)
+        return ReviewDataService(
+            active_repo,
+            approval_store=approvals,
+            settings_loader=settings_loader or load_user_settings,
+        )
 
     def review_read_service(
         self,
@@ -96,12 +102,14 @@ class AppContainer:
     def step_handlers(self) -> StepHandlers:
         if self._step_handlers is None:
             from quoting.api.step_handlers import StepHandlers
+            from quoting.api.settings_store import load_user_settings
 
             repo = self.review_repo()
             self._step_handlers = StepHandlers(
                 repo=repo,
                 pipeline=self.pipeline(),
                 progress_store=self.progress_store(repo),
+                settings_loader=load_user_settings,
             )
         return self._step_handlers
 
@@ -170,14 +178,19 @@ class AppContainer:
 
         repo = self.review_repo()
         approvals = self.approval_store(repo)
-        review_data = self.review_data_service(repo, approval_store=approvals)
+        settings = settings_loader or load_user_settings
+        review_data = self.review_data_service(
+            repo,
+            approval_store=approvals,
+            settings_loader=settings,
+        )
         review_reads = self.review_read_service(repo)
 
         return ReviewWorkflowService(
             repo=repo,
             pipeline=pipeline or self.pipeline(),
             review_ui_base_url=review_ui_base_url,
-            settings_loader=settings_loader or load_user_settings,
+            settings_loader=settings,
             review_data_loader=review_data_loader,
             quotation_builder=quotation_builder or build_quotation_with_overrides,
             quality_gate_evaluator=quality_gate_evaluator or evaluate_quality_gate,

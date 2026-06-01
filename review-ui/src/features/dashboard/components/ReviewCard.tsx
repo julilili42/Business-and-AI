@@ -1,4 +1,5 @@
 import { AlertCircle, ShieldAlert } from "lucide-react";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import type { KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -36,6 +37,7 @@ export function ReviewCard({
   const rate = matchRate(review);
   const manualClarification = Boolean(review.escalation?.escalated);
   const statusLabel = manualClarification ? "Klärung" : cfg.label;
+  const clarificationReason = review.escalation?.reason?.trim();
   const hasOpenPositions = review.matches_no_match > 0 && review.status !== "abgeschlossen";
 
   const openReview = () => navigate(detailHref);
@@ -76,15 +78,19 @@ export function ReviewCard({
 
       {/* Status */}
       <td className="w-36 px-4 py-4 align-middle">
-        <div className="flex items-center gap-2">
-          {manualClarification ? (
-            <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-warning" aria-hidden="true" />
-          ) : (
-            <span className={cn("h-2 w-2 shrink-0 rounded-full", cfg.dot)} aria-hidden="true" />
-          )}
-          <span className={cn("text-xs font-semibold", manualClarification ? "text-warning" : cfg.text)}>
-            {statusLabel}
-          </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            {manualClarification ? (
+              <ClarificationStatus reason={clarificationReason} />
+            ) : (
+              <>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", cfg.dot)} aria-hidden="true" />
+                <span className={cn("text-xs font-semibold", cfg.text)}>
+                  {statusLabel}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       </td>
 
@@ -111,17 +117,6 @@ export function ReviewCard({
             <AlertCircle className="h-2.5 w-2.5" aria-hidden="true" />
             {review.matches_no_match} ohne Match
           </span>
-        )}
-        {manualClarification && (
-          <div
-            className="mt-1 flex max-w-full items-center gap-1.5 truncate text-[11px] font-medium text-warning"
-            title={review.escalation?.reason}
-          >
-            <ShieldAlert className="h-3 w-3 shrink-0" aria-hidden="true" />
-            <span className="truncate">
-              {review.escalation?.reason || "Manuelle Klärung erforderlich"}
-            </span>
-          </div>
         )}
       </td>
 
@@ -156,5 +151,36 @@ export function ReviewCard({
         </span>
       </td>
     </tr>
+  );
+}
+
+function ClarificationStatus({ reason }: { reason?: string }) {
+  const label = reason || "Manuelle Klärung erforderlich";
+
+  return (
+    <Tooltip.Root delayDuration={120}>
+      <Tooltip.Trigger asChild>
+        <span
+          tabIndex={0}
+          className="inline-flex items-center gap-1.5 rounded-full border border-amber-600/30 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 outline-none transition-colors hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-amber-300/35 dark:bg-amber-300/15 dark:text-amber-200 dark:hover:bg-amber-300/20"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <ShieldAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          Klärung
+        </span>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content
+          side="top"
+          align="start"
+          sideOffset={8}
+          className="z-50 max-w-xs rounded-md border border-border bg-surface px-3 py-2 text-xs font-medium leading-snug text-foreground shadow-card"
+        >
+          {label}
+          <Tooltip.Arrow className="fill-surface" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }

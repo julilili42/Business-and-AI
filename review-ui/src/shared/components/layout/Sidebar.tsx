@@ -9,7 +9,7 @@ export const MAIN_NAV = [
   { to: "/", label: "Übersicht", icon: LayoutDashboard, end: true },
   { to: "/stammdaten", label: "Stammdaten", icon: Database, end: false },
   { to: "/status", label: "Status", icon: Activity, end: false },
-  { to: "/mail-vorlage", label: "E-Mail & Dateiname", icon: Mail, end: false },
+  { to: "/mail-vorlage", label: "Vorlagen", icon: Mail, end: false },
   { to: "/settings", label: "Einstellungen", icon: SettingsIcon, end: false },
 ] as const;
 

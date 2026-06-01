@@ -43,12 +43,12 @@ export function SettingsPage() {
 
   return (
     <PageContainer>
-      <header className="mb-8">
-        <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
-          Einstellungen<span className="text-ek-blue">.</span>
+      <header className="mb-6">
+        <h1 className="font-display text-3xl font-extrabold leading-tight tracking-tight md:text-4xl">
+          Einstellungen<span className="text-brand">.</span>
         </h1>
-        <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
-          Stammdaten für PDF-Header, Editor-Verhalten und Matching-Schwellen.
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          Workflow, PDF-Ausgabe und Matching steuern.
         </p>
       </header>
 
@@ -94,43 +94,43 @@ function SettingsForm({ initial, saving, saveSuccess, saveError, onSave }: Setti
         <SubSection title="Firmendaten">
           <Grid>
             <Field label="Firmenname">
-              <Input placeholder="Muster GmbH" {...form.register("company.company_name")} />
+              <SettingsInput placeholder="Muster GmbH" {...form.register("company.company_name")} />
             </Field>
             <Field label="Land">
-              <Input placeholder="Deutschland" {...form.register("company.company_country")} />
+              <SettingsInput placeholder="Deutschland" {...form.register("company.company_country")} />
             </Field>
-          </Grid>
-          <Field label="Anschrift">
-            <div className="space-y-2">
-              <Input
+            <Field label="Straße">
+              <SettingsInput
                 placeholder="Musterstraße 1"
                 {...form.register("company.company_address")}
               />
-              <Input
+            </Field>
+            <Field label="PLZ / Ort">
+              <SettingsInput
                 placeholder="12345 Musterstadt"
                 {...form.register("company.company_zip_city")}
               />
-            </div>
-          </Field>
+            </Field>
+          </Grid>
         </SubSection>
 
         <SubSection title="Kontakt">
           <Grid>
             <Field label="Name">
-              <Input placeholder="Max Mustermann" {...form.register("company.contact_person")} />
+              <SettingsInput placeholder="Max Mustermann" {...form.register("company.contact_person")} />
             </Field>
             <Field label="Telefon">
-              <Input placeholder="+49 30 123456" {...form.register("company.contact_phone")} />
+              <SettingsInput placeholder="+49 30 123456" {...form.register("company.contact_phone")} />
             </Field>
             <Field label="E-Mail">
-              <Input
+              <SettingsInput
                 type="email"
                 placeholder="angebot@muster.de"
                 {...form.register("company.contact_email")}
               />
             </Field>
             <Field label="Gültigkeit" hint="Tage">
-              <Input
+              <SettingsInput
                 type="number"
                 min={1}
                 max={365}
@@ -143,24 +143,24 @@ function SettingsForm({ initial, saving, saveSuccess, saveError, onSave }: Setti
         <SubSection title="Kommerzielle Standards">
           <Grid>
             <Field label="Lieferbedingung">
-              <Input placeholder="EXW Werk" {...form.register("company.delivery_term")} />
+              <SettingsInput placeholder="EXW Werk" {...form.register("company.delivery_term")} />
             </Field>
             <Field label="Zahlungsbedingung">
-              <Input placeholder="30 Tage netto" {...form.register("company.payment_term")} />
+              <SettingsInput placeholder="30 Tage netto" {...form.register("company.payment_term")} />
             </Field>
           </Grid>
         </SubSection>
       </SettingsCard>
 
-      <SettingsCard
-        icon={<Settings2 className="h-4 w-4" />}
-        title="Verarbeitung"
-        description="Matching-Schwellen und Editor-Verhalten."
-      >
+        <SettingsCard
+          icon={<Settings2 className="h-4 w-4" />}
+          title="Verarbeitung"
+          description="Schwellen für automatische Stammdaten-Treffer."
+        >
         <SubSection title="Matching">
           <Grid>
             <Field label="Fuzzy-Schwelle" hint="50 – 100">
-              <Input
+              <SettingsInput
                 type="number"
                 min={50}
                 max={100}
@@ -168,7 +168,7 @@ function SettingsForm({ initial, saving, saveSuccess, saveError, onSave }: Setti
               />
             </Field>
             <Field label="Semantische Schwelle" hint="40 – 100">
-              <Input
+              <SettingsInput
                 type="number"
                 min={40}
                 max={100}
@@ -178,24 +178,6 @@ function SettingsForm({ initial, saving, saveSuccess, saveError, onSave }: Setti
           </Grid>
         </SubSection>
 
-        <SubSection title="Editor-Verhalten">
-          <div className="divide-y divide-border">
-            <Toggle
-              label="PDF automatisch neu generieren"
-              checked={form.watch("workflow.auto_refresh_pdf")}
-              onCheckedChange={(v) =>
-                form.setValue("workflow.auto_refresh_pdf", v, { shouldDirty: true })
-              }
-            />
-            <Toggle
-              label="Reset bestätigen"
-              checked={form.watch("workflow.confirm_before_reset")}
-              onCheckedChange={(v) =>
-                form.setValue("workflow.confirm_before_reset", v, { shouldDirty: true })
-              }
-            />
-          </div>
-        </SubSection>
       </SettingsCard>
 
       <div className="pt-2">
@@ -239,7 +221,7 @@ function SettingsCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6 px-5 pb-5">{children}</CardContent>
+      <CardContent className="space-y-4 px-5 pb-5">{children}</CardContent>
     </Card>
   );
 }
@@ -252,17 +234,17 @@ function SubSection({
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-4 border-t border-border pt-6 first:border-t-0 first:pt-0">
+    <section className="space-y-3 border-t border-border pt-4 first:border-t-0 first:pt-0">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h3>
-      <div className="space-y-4">{children}</div>
+      <div className="space-y-3">{children}</div>
     </section>
   );
 }
 
 function Grid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-1 gap-x-5 gap-y-4 md:grid-cols-2">{children}</div>;
+  return <div className="grid grid-cols-1 gap-x-5 gap-y-3 md:grid-cols-2">{children}</div>;
 }
 
 function Field({
@@ -275,7 +257,7 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <Label className="text-xs">
         {label}
         {hint && <span className="ml-1 font-normal text-muted-foreground">· {hint}</span>}
@@ -285,44 +267,6 @@ function Field({
   );
 }
 
-function Toggle({
-  label,
-  description,
-  checked,
-  onCheckedChange,
-}: {
-  label: string;
-  description?: string;
-  checked: boolean;
-  onCheckedChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-6 py-3.5 first:pt-0 last:pb-0">
-      <div>
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        {description && (
-          <p className="mt-0.5 text-[11px] text-muted-foreground">{description}</p>
-        )}
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-label={label}
-        aria-checked={checked}
-        onClick={() => onCheckedChange(!checked)}
-        className={cn(
-          "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-          checked ? "bg-ek-blue" : "bg-muted",
-        )}
-      >
-        <span
-          className={cn(
-            "pointer-events-none block h-4 w-4 rounded-full bg-white shadow-md transition-transform",
-            checked ? "translate-x-4" : "translate-x-0",
-          )}
-        />
-      </button>
-    </div>
-  );
+function SettingsInput(props: React.ComponentProps<typeof Input>) {
+  return <Input {...props} className={cn("h-9", props.className)} />;
 }

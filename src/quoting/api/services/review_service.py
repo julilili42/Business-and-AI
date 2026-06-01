@@ -6,11 +6,13 @@ FastAPI dependencies. Used by the reviews/stammdaten routers.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from quoting.api.approval_store import ApprovalStore
+from quoting.api.settings_store import AppSettings, load_user_settings
 from quoting.core import Anfrage
 from quoting.ingestion import Mail
 from quoting.matching import MatchResult, match_positions
@@ -49,10 +51,44 @@ def match_from_dict(item: dict) -> MatchResult:
     )
 
 
+SettingsLoader = Callable[[], AppSettings]
+
+
+def matching_thresholds(
+    pipeline: QuotingPipeline,
+    settings_loader: SettingsLoader = load_user_settings,
+) -> tuple[int, int]:
+    """Return user-configured matching thresholds, falling back to runtime config."""
+    try:
+        matching = settings_loader().matching
+    except Exception:
+        return pipeline.settings.fuzzy_threshold, pipeline.settings.semantic_threshold
+
+    return (
+        int(matching.fuzzy_threshold),
+        int(matching.semantic_threshold),
+    )
+
+
+def match_positions_with_settings(
+    anfrage: Anfrage,
+    pipeline: QuotingPipeline,
+    settings_loader: SettingsLoader = load_user_settings,
+) -> list[MatchResult]:
+    fuzzy_threshold, semantic_threshold = matching_thresholds(pipeline, settings_loader)
+    return match_positions(
+        anfrage.positionen,
+        pipeline.stammdaten,
+        fuzzy_threshold=fuzzy_threshold,
+        semantic_threshold=semantic_threshold,
+    )
+
+
 @dataclass
 class ReviewDataService:
     repo: SQLiteReviewRepository
     approval_store: ApprovalStore | None = None
+    settings_loader: SettingsLoader = load_user_settings
 
     @property
     def approvals(self) -> ApprovalStore:
@@ -133,20 +169,10 @@ class ReviewDataService:
             if len(saved_by_pos) == len(active_pos_nrs):
                 return [saved_by_pos[pos.pos_nr] for pos in anfrage.positionen]
 
-            recomputed = match_positions(
-                anfrage.positionen,
-                pipeline.stammdaten,
-                fuzzy_threshold=pipeline.settings.fuzzy_threshold,
-                semantic_threshold=pipeline.settings.semantic_threshold,
-            )
+            recomputed = match_positions_with_settings(anfrage, pipeline, self.settings_loader)
             return [saved_by_pos.get(match.pos_nr, match) for match in recomputed]
 
-        return match_positions(
-            anfrage.positionen,
-            pipeline.stammdaten,
-            fuzzy_threshold=pipeline.settings.fuzzy_threshold,
-            semantic_threshold=pipeline.settings.semantic_threshold,
-        )
+        return match_positions_with_settings(anfrage, pipeline, self.settings_loader)
 
     def invalidate_approval(self, review_id: str) -> None:
         record = self.approvals.load(review_id)

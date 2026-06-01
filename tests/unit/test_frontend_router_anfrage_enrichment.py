@@ -327,6 +327,37 @@ def _matching_pipeline_stub():
     )
 
 
+def test_review_matching_uses_user_configured_thresholds(
+    sqlite_repo,
+    make_position,
+    sample_stammdaten,
+):
+    review_id = "review-user-thresholds"
+    sqlite_repo.create_review(review_id)
+    anfrage = Anfrage(
+        positionen=[make_position(artikelnummer="001GLP108O15")]
+    )
+    pipeline = SimpleNamespace(
+        stammdaten=sample_stammdaten,
+        settings=SimpleNamespace(fuzzy_threshold=100, semantic_threshold=100),
+    )
+    user_settings = SimpleNamespace(
+        matching=SimpleNamespace(fuzzy_threshold=85, semantic_threshold=70)
+    )
+
+    matches = ReviewDataService(
+        sqlite_repo,
+        settings_loader=lambda: user_settings,
+    ).load_or_recompute_matches(
+        review_id,
+        anfrage,
+        pipeline,  # type: ignore[arg-type]
+    )
+
+    assert matches[0].status == "fuzzy"
+    assert matches[0].matched_artikelnr == "001GLP108015"
+
+
 def test_editing_description_rematches_but_keeps_manual_pin(sqlite_repo, make_position):
     """Regression: after a manual pin exists, editing another position's
     match-relevant fields must still re-run automatic matching, while the

@@ -32,14 +32,13 @@ export function StammdatenPage() {
 
   return (
     <PageContainer>
-      <header className="mb-8">
+      <header className="mb-6">
         <div>
-          <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
+          <h1 className="font-display text-3xl font-extrabold leading-tight tracking-tight md:text-4xl">
             Stammdaten<span className="text-brand">.</span>
           </h1>
-          <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            Artikel im Master-Bestand suchen. Schreibgeschützte Ansicht aus
-            dem Quoting-Backend; Pflege bleibt im SAP-Quellsystem.
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Artikel suchen und Stammdaten prüfen.
           </p>
         </div>
       </header>

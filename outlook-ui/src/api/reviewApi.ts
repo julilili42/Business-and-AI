@@ -54,8 +54,7 @@ export async function startReview(
 export async function getReviewStatus(
   review: CreateReviewResponse,
 ): Promise<PipelineProgress> {
-  const statusUrl =
-    review.status_url ?? `${REVIEW_API_URL}/${review.review_id}/status`;
+  const statusUrl = `${REVIEW_API_URL}/${review.review_id}/status`;
   const response = await fetch(withCacheBust(statusUrl), {
     method: "GET",
   });

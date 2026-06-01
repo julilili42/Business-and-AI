@@ -9,6 +9,7 @@ import {
 import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { StammdatenDetailDialog } from "@/features/stammdaten/components/StammdatenDetailDialog";
 import type { ReviewDetail } from "@/shared/api/reviews";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -23,9 +24,11 @@ import { cn } from "@/shared/lib/cn";
 import { formatEur, formatQty } from "@/shared/lib/format";
 import type { MatchStatus } from "@/shared/schemas/matchResult";
 import type { ManualOverride, QuotationItem } from "@/shared/schemas/quotation";
+import type { StammdatenRow } from "@/shared/schemas/stammdaten";
 
 import type { Issue, QualityGateResult } from "../../hooks/useQualityGate";
 import { useEscalateReview } from "../../hooks/useReviewMutations";
+import { useStammdatenSearch } from "../../hooks/useStammdaten";
 import { RequirementsChecklist } from "./RequirementsChecklist";
 
 interface ApprovalSummaryProps {
@@ -80,6 +83,15 @@ export function ApprovalSummary({
   const [expanded, setExpanded] = useState(true);
   const [clarificationOpen, setClarificationOpen] = useState(false);
   const [clarificationReason, setClarificationReason] = useState("");
+  const [selectedArticleNr, setSelectedArticleNr] = useState<string | null>(null);
+  const selectedArticle = useStammdatenSearch(
+    selectedArticleNr ?? "",
+    Boolean(selectedArticleNr),
+  );
+  const selectedArticleRow = findStammdatenRow(
+    selectedArticle.data,
+    selectedArticleNr,
+  );
   const escalation = useEscalateReview(detail.review_id);
   const manualClarificationActive = Boolean(detail.escalation?.escalated);
   const showManualClarification = !isApproved || manualClarificationActive;
@@ -182,33 +194,44 @@ export function ApprovalSummary({
         id="approval-summary-content"
         className={cn("p-4", !expanded && "hidden")}
       >
-        <div
-          className={cn(
-            "grid gap-4",
+          <div
+            className={cn(
+            "grid gap-x-4 gap-y-3",
             showSidePanel && "xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start",
           )}
         >
-          <div className="order-2 min-w-0 space-y-3 xl:order-1">
+          <div className="order-2 min-w-0 space-y-3 xl:contents">
             {!isApproved && (
-              <RequirementsChecklist
-                anforderungen={detail.anfrage.anforderungen ?? []}
-                acknowledgedIndices={detail.requirements_acknowledged ?? []}
-                mailAttachments={detail.mail_attachments}
-              />
+              <div className="xl:col-start-1 xl:row-start-1">
+                <RequirementsChecklist
+                  anforderungen={detail.anfrage.anforderungen ?? []}
+                  acknowledgedIndices={detail.requirements_acknowledged ?? []}
+                  mailAttachments={detail.mail_attachments}
+                />
+              </div>
             )}
 
-            <div className="overflow-hidden rounded-md border border-border">
+            <div className="overflow-hidden rounded-md border border-border xl:col-span-2 xl:col-start-1 xl:row-start-2">
               <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
+                <table className="w-full table-fixed text-left text-sm">
+                  <colgroup>
+                    <col className="w-16" />
+                    <col className="w-44" />
+                    <col />
+                    <col className="w-28" />
+                    <col className="w-32" />
+                    <col className="w-36" />
+                    <col className="w-24" />
+                  </colgroup>
                   <thead className="sticky top-0 bg-muted text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      <th className="w-16 px-3 py-1.5">Pos</th>
-                      <th className="w-36 px-3 py-1.5">Artikel-Nr.</th>
-                      <th className="min-w-64 px-3 py-1.5">Bezeichnung</th>
-                      <th className="px-3 py-1.5 text-right">Menge</th>
-                      <th className="px-3 py-1.5 text-right">Stückpreis</th>
-                      <th className="px-3 py-1.5 text-right">Gesamt</th>
-                      <th className="px-3 py-1.5">Status</th>
+                      <th className="px-3 py-1.5">Pos</th>
+                      <th className="px-3 py-1.5">Artikel-Nr.</th>
+                      <th className="px-3 py-1.5">Bezeichnung</th>
+                      <th className="whitespace-nowrap px-3 py-1.5 text-right">Menge</th>
+                      <th className="whitespace-nowrap px-3 py-1.5 text-right">Stückpreis</th>
+                      <th className="whitespace-nowrap px-3 py-1.5 text-right">Gesamt</th>
+                      <th className="whitespace-nowrap px-3 py-1.5">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-surface">
@@ -219,6 +242,7 @@ export function ApprovalSummary({
                           item={item}
                           matchStatus={matchesByPos.get(item.pos_nr)?.status ?? "no_match"}
                           hasOverride={hasManualOverride(item, overrides)}
+                          onArticleClick={setSelectedArticleNr}
                         />
                       ))
                     ) : (
@@ -248,7 +272,7 @@ export function ApprovalSummary({
             </div>
 
             {(priceWarningCount > 0 || gate.stats.unmatched > 0) && (
-              <div className="flex flex-wrap gap-2 text-xs">
+              <div className="flex flex-wrap gap-2 text-xs xl:col-span-2 xl:col-start-1 xl:row-start-3">
                 {priceWarningCount > 0 && (
                   <SummaryPill tone="warning">{priceWarningCount} Preiswarnung(en)</SummaryPill>
                 )}
@@ -262,7 +286,7 @@ export function ApprovalSummary({
           </div>
 
           {showSidePanel && (
-            <aside className="order-1 space-y-3 xl:order-2 xl:sticky xl:top-4">
+            <aside className="order-1 space-y-3 xl:col-start-2 xl:row-start-1 xl:self-stretch xl:sticky xl:top-4">
               {showIssues && (
                 <IssuesBlock blockers={gate.blockers} warnings={gate.warnings} />
               )}
@@ -273,12 +297,12 @@ export function ApprovalSummary({
                 ) : (
                   <div
                     id="approval-controls"
-                    className="scroll-mt-24 overflow-hidden rounded-md border border-border bg-surface"
+                    className="scroll-mt-24 overflow-hidden rounded-md border border-border bg-surface xl:h-full"
                   >
                     <div className="bg-muted px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                       Freigabe
                     </div>
-                    <div className="p-3">{approvalControls}</div>
+                    <div className="p-2.5">{approvalControls}</div>
                   </div>
                 )
               )}
@@ -286,6 +310,13 @@ export function ApprovalSummary({
           )}
         </div>
       </div>
+
+      {selectedArticleRow && (
+        <StammdatenDetailDialog
+          row={selectedArticleRow}
+          onClose={() => setSelectedArticleNr(null)}
+        />
+      )}
     </section>
   );
 }
@@ -601,31 +632,55 @@ function SummaryRow({
   item,
   matchStatus,
   hasOverride,
+  onArticleClick,
 }: {
   item: QuotationItem;
   matchStatus: MatchStatus;
   hasOverride: boolean;
+  onArticleClick: (artikelNr: string) => void;
 }) {
+  const articleNr = item.artikel_nr.trim();
+  const clickable = articleNr.length > 0;
   return (
-    <tr>
+    <tr
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      aria-label={clickable ? `Artikel ${articleNr} öffnen` : undefined}
+      onClick={clickable ? () => onArticleClick(articleNr) : undefined}
+      onKeyDown={(event) => {
+        if (!clickable || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        onArticleClick(articleNr);
+      }}
+      className={cn(
+        clickable &&
+          "group cursor-pointer transition-all duration-150 hover:bg-ek-blue-soft/35 hover:shadow-[inset_3px_0_0_hsl(var(--ek-blue))] focus-visible:bg-ek-blue-soft/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+      )}
+    >
       <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">
         {item.pos_nr}
       </td>
       <td className="px-3 py-1.5">
-        <span className="font-medium text-foreground">{item.artikel_nr || "—"}</span>
+        {articleNr ? (
+          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground transition-colors group-hover:bg-brand-soft group-hover:text-brand">
+            {articleNr}
+          </span>
+        ) : (
+          <span className="font-medium text-foreground">—</span>
+        )}
       </td>
       <td className="px-3 py-1.5">
         <div className="max-w-[32rem] truncate text-xs text-muted-foreground">
           {item.bezeichnung || "—"}
         </div>
       </td>
-      <td className="px-3 py-1.5 text-right tabular-nums">
+      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
         {formatQty(item.menge)} {item.einheit}
       </td>
-      <td className="px-3 py-1.5 text-right tabular-nums">
+      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
         {formatEur(item.einzelpreis)}
       </td>
-      <td className="px-3 py-1.5 text-right font-semibold tabular-nums">
+      <td className="whitespace-nowrap px-3 py-1.5 text-right font-semibold tabular-nums">
         {formatEur(item.gesamtpreis)}
       </td>
       <td className="px-3 py-1.5">
@@ -666,4 +721,21 @@ function hasManualOverride(item: QuotationItem, overrides: ManualOverride[]): bo
     if (override.target === "pos") return override.pos_nr === item.pos_nr;
     return override.artikel_nr === item.artikel_nr;
   });
+}
+
+function findStammdatenRow(
+  rows: StammdatenRow[] | undefined,
+  artikelNr: string | null,
+): StammdatenRow | null {
+  if (!rows || !artikelNr) return null;
+  const normalized = normalizeArticleNr(artikelNr);
+  return (
+    rows.find((row) => normalizeArticleNr(row.artikel_nr) === normalized) ??
+    rows[0] ??
+    null
+  );
+}
+
+function normalizeArticleNr(value: string): string {
+  return value.trim().toLocaleLowerCase("de-DE");
 }

@@ -382,13 +382,13 @@ export function DebugPage() {
 
   return (
     <PageContainer>
-      <header className="mb-8 flex items-start justify-between gap-4">
+      <header className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
+          <h1 className="font-display text-3xl font-extrabold leading-tight tracking-tight md:text-4xl">
             System-Diagnose<span className="text-brand">.</span>
           </h1>
-          <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            Systemzustand, Pipeline-Fehler und Konfigurationschecks auf einen Blick.
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Systemzustand und Konfiguration prüfen.
           </p>
         </div>
         <button

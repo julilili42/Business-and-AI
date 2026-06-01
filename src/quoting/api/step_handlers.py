@@ -30,12 +30,18 @@ mutation paths.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from quoting.api.progress_store import ProgressStore
-from quoting.api.services.review_service import ReviewDataService, match_from_dict
+from quoting.api.services.review_service import (
+    ReviewDataService,
+    match_from_dict,
+    match_positions_with_settings,
+)
+from quoting.api.settings_store import AppSettings, load_user_settings
 from quoting.core import Anfrage
 from quoting.matching import MatchResult
 from quoting.pipeline import QuotingPipeline, StepContext, StepProgress
@@ -43,6 +49,8 @@ from quoting.pricing import Quotation
 from quoting.reviews import draft_pdf_filename
 from quoting.reviews.quotation_store import quotation_from_dict
 from quoting.reviews.sqlite_repository import SQLiteReviewRepository
+
+SettingsLoader = Callable[[], AppSettings]
 
 
 class StepInputMissing(RuntimeError):
@@ -59,12 +67,16 @@ class StepHandlers:
     repo: SQLiteReviewRepository
     pipeline: QuotingPipeline
     progress_store: ProgressStore
+    settings_loader: SettingsLoader = load_user_settings
     _data_service: ReviewDataService | None = field(default=None, init=False, repr=False)
 
     @property
     def data_service(self) -> ReviewDataService:
         if self._data_service is None:
-            self._data_service = ReviewDataService(self.repo)
+            self._data_service = ReviewDataService(
+                self.repo,
+                settings_loader=self.settings_loader,
+            )
         return self._data_service
 
     # ---------------------------------------------------------------- helpers
@@ -151,7 +163,21 @@ class StepHandlers:
             return  # already done
 
         anfrage = self._load_anfrage(review_id)
-        self.pipeline.match(anfrage, self._ctx(review_id))
+        ctx = self._ctx(review_id)
+        ctx.report(
+            "Matching",
+            "started",
+            f"{len(anfrage.positionen)} Positionen vs. {len(self.pipeline.stammdaten)} Stammdaten",
+        )
+        matches = match_positions_with_settings(
+            anfrage,
+            self.pipeline,
+            self.settings_loader,
+        )
+        ctx.persist("matches", [m.to_dict() for m in matches])
+        exact = sum(1 for m in matches if m.status == "exact")
+        no_match = sum(1 for m in matches if m.status == "no_match")
+        ctx.report("Matching", "completed", f"{exact} exakt, {no_match} kein Treffer")
 
     def price(self, review_id: str) -> None:
         if self.repo.load_quotation_initial(review_id) is not None:
